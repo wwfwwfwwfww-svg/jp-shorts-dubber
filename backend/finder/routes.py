@@ -5,8 +5,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.responses import Response
 
 from .. import config
-from . import (channels, db, export, query, quota, search, settings, telegram,
-               youtube)
+from . import (channels, db, export, query, quota, report, scheduler, search,
+               settings, telegram, youtube)
 from .models import (CategoryCreate, KeywordCreate, RegisterChannelRequest,
                      SearchRequest, SettingsUpdate, ValidateKeysRequest, VideoPatch)
 
@@ -35,7 +35,11 @@ def get_settings():
 @router.put("/settings")
 def put_settings(patch: SettingsUpdate):
     db.init_db()
-    return settings.update(patch)
+    result = settings.update(patch)
+    # 스캔 주기·아침 수집 시각/사용여부 변경을 재시작 없이 반영
+    if any(v is not None for v in (patch.scan_hours, patch.morning_hour, patch.morning_enabled)):
+        scheduler.reschedule()
+    return result
 
 
 @router.post("/validate_keys")
@@ -239,3 +243,17 @@ def scan_channels(background: BackgroundTasks, channel_id: str = Query("")):
         raise HTTPException(400, "YOUTUBE_API_KEY가 필요합니다.")
     background.add_task(channels.scan_reference, channel_id or None)
     return {"ok": True, "message": "레퍼런스 채널 스캔을 시작했습니다."}
+
+
+# --------------------------------------------------------------------------- #
+# Report + scheduler
+# --------------------------------------------------------------------------- #
+@router.get("/report/today")
+def report_today():
+    db.init_db()
+    return report.today()
+
+
+@router.get("/scheduler")
+def scheduler_status():
+    return scheduler.status()

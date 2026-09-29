@@ -384,6 +384,66 @@
     try { await jsend("DELETE", "/channels/" + id); loadChannels(); } catch (e) { alert("실패: " + e.message); }
   }
 
+  // ---------- 오늘의 리포트 ----------
+  async function loadReport() {
+    const box = $("f-report");
+    box.innerHTML = '<div class="f-empty">집계 중...</div>';
+    try {
+      const [rep, sched] = await Promise.all([jget("/report/today"), jget("/scheduler").catch(() => null)]);
+      renderReport(rep);
+      if (sched) {
+        const en = sched.morning_enabled ? `아침 ${sched.morning_hour}시 자동수집 ON` : "아침 자동수집 OFF";
+        $("f-report-sched").textContent = `${en} · 스캔 ${sched.scan_hours}h · 스케줄러 ${sched.running ? "동작" : "중지"}`;
+      }
+    } catch (e) { box.innerHTML = "불러오기 실패: " + e.message; }
+  }
+
+  function renderReport(r) {
+    const box = $("f-report");
+    const g = r.gainers || [];
+    const nt = r.new_today || { count: 0, by_category: [] };
+    const wc = r.watch_channels || { multi: [], single: [] };
+    const cs = r.category_stats || [];
+    const un = r.unentered || [];
+    const st = r.structure || { duration_buckets: {}, caption: {} };
+    const li = (rows, fn) => rows.length ? rows.map(fn).join("") : '<div class="f-empty">없음</div>';
+
+    box.innerHTML = `
+      <div class="f-report-grid">
+        <div class="f-rblock">
+          <h3>① 어제 대비 급등 (조회수 증가폭)</h3>
+          ${li(g.slice(0, 10), (v) => `<div class="f-rrow"><span>${escapeHtml(v.title)}</span>
+            <b>+${fmtViews(v.delta)}</b></div>`)}
+        </div>
+        <div class="f-rblock">
+          <h3>② 오늘 신규 ${nt.count}편 · 카테고리별</h3>
+          ${li(nt.by_category, (c) => `<div class="f-rrow"><span>${escapeHtml(c.cat)}</span><b>${c.n}</b></div>`)}
+        </div>
+        <div class="f-rblock">
+          <h3>③ 요주의 채널 (작은 채널·크게 터짐)</h3>
+          <div class="f-rsub">여러 편 터진 곳</div>
+          ${li(wc.multi, (c) => `<div class="f-rrow"><span>${escapeHtml(c.channel_title)} (구독 ${fmtViews(c.subscribers)})</span><b>${c.hits}편·×${c.max_mult}</b></div>`)}
+          <div class="f-rsub">한 편만 터진 곳</div>
+          ${li(wc.single, (c) => `<div class="f-rrow"><span>${escapeHtml(c.channel_title)} (구독 ${fmtViews(c.subscribers)})</span><b>×${c.max_mult}</b></div>`)}
+        </div>
+        <div class="f-rblock">
+          <h3>④ 카테고리별 통계 (조회수 중앙값)</h3>
+          ${li(cs, (c) => `<div class="f-rrow"><span>${escapeHtml(c.category)} · ${c.count}편</span><b>${fmtViews(c.median_views)}</b></div>`)}
+        </div>
+        <div class="f-rblock">
+          <h3>⑤ 일본 미진출 소재 (${un.length})</h3>
+          ${li(un.slice(0, 12), (v) => `<div class="f-rrow"><span>${escapeHtml(v.title)}</span><b>${fmtViews(v.views)}</b></div>`)}
+        </div>
+        <div class="f-rblock">
+          <h3>⑥ 영상 구조 통계</h3>
+          <div class="f-rsub">길이 분포</div>
+          ${Object.entries(st.duration_buckets || {}).map(([k, v]) => `<div class="f-rrow"><span>${k}</span><b>${v}</b></div>`).join("")}
+          <div class="f-rsub">첫 화면 자막(캡션)</div>
+          <div class="f-rrow"><span>있음 / 없음 / 미상</span><b>${st.caption.yes || 0} / ${st.caption.no || 0} / ${st.caption.unknown || 0}</b></div>
+        </div>
+      </div>`;
+  }
+
   // ---------- HTML escape ----------
   function escapeHtml(s) {
     return String(s || "").replace(/[&<>"']/g, (c) =>
@@ -410,6 +470,7 @@
       try { await jsend("POST", "/channels/scan"); alert("전체 레퍼런스 채널 스캔을 시작했습니다."); }
       catch (e) { alert("실패: " + e.message); }
     });
+    $("f-report-load").addEventListener("click", loadReport);
     $("f-modal-close").addEventListener("click", closeModal);
     $("f-modal").addEventListener("click", (e) => { if (e.target === $("f-modal")) closeModal(); });
   }

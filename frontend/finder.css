@@ -116,6 +116,16 @@
 .f-channels th, .f-channels td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
 .f-channels th { color: var(--muted); font-weight: 600; }
 
+/* 오늘의 리포트 */
+.f-report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.f-rblock { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.f-rblock h3 { font-size: 13px; margin: 0 0 8px; color: var(--text); }
+.f-rsub { font-size: 11px; color: var(--muted); margin: 8px 0 4px; }
+.f-rrow { display: flex; justify-content: space-between; gap: 10px; font-size: 12px;
+  padding: 3px 0; border-bottom: 1px solid var(--line); }
+.f-rrow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.f-rrow b { color: var(--text); white-space: nowrap; }
+
 /* 모달(임베드 재생) */
 .f-modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex;
   align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
