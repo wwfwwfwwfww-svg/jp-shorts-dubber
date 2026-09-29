@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>일본어 쇼츠 더빙 자동화</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎬 일본어 영화쇼츠 더빙 — 자동 파이프라인</h1>
+    <p class="sub">업로드 → ① 자막추출(Vision) → ② 일본어 → ③ TTS/QA → ④ 메타데이터</p>
+    <div id="health" class="health"></div>
+  </header>
+
+  <main>
+    <!-- 스텝퍼 -->
+    <div id="stepper" class="stepper">
+      <div class="step" data-step="0">입력</div>
+      <div class="step" data-step="1">① 자막추출</div>
+      <div class="step" data-step="2">② 일본어</div>
+      <div class="step" data-step="3">③ TTS/QA</div>
+      <div class="step" data-step="4">④ 메타</div>
+    </div>
+
+    <div id="status" class="status"></div>
+    <button id="return-latest" class="return-latest" hidden>최신 단계로 →</button>
+
+    <!-- 입력 -->
+    <section class="card" id="card-input">
+      <h2>입력</h2>
+      <div class="tabs">
+        <button class="tab active" data-tab="upload">🎬 영상 업로드</button>
+        <button class="tab" data-tab="japaste">📋 일본어 대본 붙여넣기 (백업)</button>
+      </div>
+
+      <div id="panel-upload" class="panel">
+        <div class="row"><label>유튜브 / 틱톡 URL</label><input type="text" id="url" placeholder="https://..." /></div>
+        <div class="or">— 또는 —</div>
+        <div class="row"><label>MP4 파일 업로드</label><input type="file" id="file" accept="video/*" /></div>
+        <details class="advanced">
+          <summary>고급 (자막 크롭 영역)</summary>
+          <div class="grid">
+            <div><label>크롭 시작(하단비율)</label><input type="number" id="crop_top" value="0.4" step="0.01" min="0" max="1" /></div>
+            <div><label>크롭 끝</label><input type="number" id="crop_bottom" value="1.0" step="0.01" min="0" max="1" /></div>
+          </div>
+        </details>
+        <button id="upload-btn">업로드</button>
+      </div>
+
+      <div id="panel-japaste" class="panel" hidden>
+        <div class="row"><label>일본어 대본 (형식: 시작초 | 종료초 | 일본어)</label>
+          <textarea id="jadirect-text" rows="8" placeholder="0.0 | 2.0 | 女は蝋の油を爪の隙間に注いだ後&#10;..."></textarea></div>
+        <div class="row"><label>제목(선택)</label><input type="text" id="jadirect-title" placeholder="예: ダイヤ窃盗の要約" /></div>
+        <button id="jadirect-btn">가져오기 → ③ TTS로</button>
+        <p class="note">이미 만든 일본어 대본을 바로 TTS 단계로. ELEVENLABS_API_KEY만 필요.</p>
+      </div>
+    </section>
+
+    <!-- 게이트: 분석 시작 -->
+    <section class="card gate" id="gate-extract" hidden>
+      <h2>① 한국어/영어 자막 추출</h2>
+      <div id="meta-line" class="meta"></div>
+      <p class="note">Claude Vision이 화면 자막을 직접 읽어 구간·타이밍을 만듭니다. (유료 · ANTHROPIC_API_KEY 필요)</p>
+      <button id="extract-btn">🔍 분석 시작</button>
+    </section>
+
+    <!-- ① 자막 확인 -->
+    <section class="card" id="card-source" hidden>
+      <h2>① 줄거리 확인 <span id="src-count" class="count"></span></h2>
+      <div id="src-title" class="src-title"></div>
+      <p class="note">인식된 대사를 한국어 줄거리로 정리해 보여줍니다. 내용을 먼저 확인하세요.
+        오탈자·타이밍은 아래 '구간별 수정'을 펼쳐 고칠 수 있어요.</p>
+      <textarea id="source-story" class="story" rows="12" readonly></textarea>
+      <details class="advanced" id="source-detail">
+        <summary>구간별 보기 / 수정 (오탈자·타입·타이밍)</summary>
+        <div class="legend"><span class="badge narration">나레이션(흰)</span><span class="badge dialogue">대사(색)</span>
+          <span class="hint">텍스트·타입 수정 가능</span></div>
+        <div id="source-segments"></div>
+        <div class="actions"><button id="save-src">수정 저장</button><span id="save-src-msg"></span></div>
+      </details>
+      <div class="actions"><button id="to-translate" class="next">다음 ② 일본어 변환 →</button></div>
+    </section>
+
+    <!-- ② 일본어 확인 -->
+    <section class="card" id="card-ja" hidden>
+      <h2>② 일본어 확인 <span id="ja-count" class="count"></span></h2>
+      <div id="ja-budget" class="budget"></div>
+      <div class="speedctl">
+        <label for="speed-range">배속</label>
+        <input type="range" id="speed-range" min="1.00" max="1.18" step="0.01" value="1.14" />
+        <output id="speed-out">1.14</output>
+        <span id="len-est" class="len-est"></span>
+      </div>
+      <div id="ja-segments"></div>
+      <div class="actions"><button id="back-to-src" class="back">← 이전 단계</button>
+        <button id="save-ja">수정 저장</button><span id="save-ja-msg"></span>
+        <select id="voice-select"><option value="">기본/자동 음성</option></select>
+        <button id="to-tts" class="next">다음 ③ TTS 생성 →</button></div>
+      <p class="note">일본어를 수정하거나 배속을 바꾸면 예상 길이가 실시간 재계산됩니다. 배속은 영상 전체 단일값. 대본이 짧으면 길이를 맞추려 1.0까지 내려갑니다.</p>
+    </section>
+
+    <!-- ③ TTS 결과 -->
+    <section class="card" id="card-tts" hidden>
+      <h2>③ TTS 결과 · QA</h2>
+      <div id="qa-box" class="qa"></div>
+      <div class="downloads">
+        <a id="dl-mp3" class="dlbtn" href="#">⬇ MP3</a>
+        <a id="dl-wav" class="dlbtn" href="#">⬇ WAV</a>
+        <a id="dl-srt-ja" class="dlbtn" href="#">⬇ SRT(JP)</a>
+        <a id="dl-srt-kr" class="dlbtn" href="#">⬇ SRT(KR)</a>
+        <a id="dl-zip" class="dlbtn" href="#">⬇ ZIP</a>
+      </div>
+      <p class="note">순차 연결 · 자동 음량정규화 완료. 구간을 들어보고 이상하면 텍스트 수정 후 재생성.</p>
+      <div id="tts-segments"></div>
+      <div class="actions"><button id="back-to-ja" class="back">← 이전 단계</button>
+        <button id="to-meta" class="next">다음 ④ 메타데이터 →</button></div>
+    </section>
+
+    <!-- ④ 메타데이터 -->
+    <section class="card" id="card-meta" hidden>
+      <h2>④ 메타데이터</h2>
+      <div class="actions"><button id="meta-btn">🏷️ 생성</button><button id="meta-regen">다시 생성</button><span id="meta-msg"></span></div>
+      <div id="meta-result"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

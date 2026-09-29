@@ -1,0 +1,29 @@
+# --- Secrets ---
+.env
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Work data: uploaded videos, generated audio, outputs (per-job dirs) ---
+data/
+
+# --- Media files (belt-and-suspenders; job media lives under data/ anyway) ---
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.flac
+*.zip
+
+# --- Logs / OS cruft ---
+*.log
+server.log
+.DS_Store
+Thumbs.db
