@@ -5,10 +5,11 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.responses import Response
 
 from .. import config
-from . import (channels, db, export, query, quota, report, scheduler, search,
-               settings, telegram, youtube)
-from .models import (CategoryCreate, KeywordCreate, RegisterChannelRequest,
-                     SearchRequest, SettingsUpdate, ValidateKeysRequest, VideoPatch)
+from . import (categorize, channels, db, export, japan_check, query, quota,
+               report, scheduler, search, settings, telegram, work, youtube)
+from .models import (CategorizeRequest, CategoryCreate, JapanCheckRequest,
+                     KeywordCreate, RegisterChannelRequest, SearchRequest,
+                     SettingsUpdate, ValidateKeysRequest, VideoPatch)
 
 router = APIRouter(prefix="/api/finder", tags=["finder"])
 
@@ -257,3 +258,36 @@ def report_today():
 @router.get("/scheduler")
 def scheduler_status():
     return scheduler.status()
+
+
+# --------------------------------------------------------------------------- #
+# M-C: AI 분류 · 일본 미진출 판별 · 작업하기
+# --------------------------------------------------------------------------- #
+@router.post("/categorize")
+def categorize_videos(req: CategorizeRequest, background: BackgroundTasks):
+    db.init_db()
+    if not config.ANTHROPIC_API_KEY:
+        raise HTTPException(400, "ANTHROPIC_API_KEY가 필요합니다.")
+    background.add_task(categorize.categorize, req.video_ids, req.limit)
+    return {"ok": True, "message": "AI 카테고리 분류를 시작했습니다. 완료 후 새로고침하세요."}
+
+
+@router.post("/japan_check")
+def japan_check_videos(req: JapanCheckRequest, background: BackgroundTasks):
+    db.init_db()
+    if not config.ANTHROPIC_API_KEY or not settings.youtube_key():
+        raise HTTPException(400, "ANTHROPIC_API_KEY와 YOUTUBE_API_KEY가 모두 필요합니다.")
+    background.add_task(japan_check.run, req.video_ids, req.top_n)
+    n = req.top_n or settings.get("japan_check_top_n") or 20
+    scope = f"{len(req.video_ids)}개" if req.video_ids else f"배수 상위 {n}개"
+    return {"ok": True, "message": f"일본 미진출 판별을 시작했습니다({scope}). 완료 후 새로고침하세요."}
+
+
+@router.post("/videos/{video_id}/work")
+def work_video(video_id: str, background: BackgroundTasks):
+    db.init_db()
+    result = work.start(video_id)
+    if not result.get("ok"):
+        raise HTTPException(404, result.get("error", "영상을 찾을 수 없습니다."))
+    background.add_task(work.download_video, video_id)
+    return result

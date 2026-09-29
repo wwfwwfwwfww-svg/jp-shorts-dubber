@@ -20,6 +20,7 @@ REGION_LANG = {
     "DE": "de", "AT": "de", "FR": "fr", "ES": "es", "MX": "es", "AR": "es",
     "BR": "pt", "PT": "pt", "ID": "id", "IN": "hi", "IT": "it", "NL": "nl",
     "TR": "tr", "PL": "pl", "RU": "ru", "VN": "vi", "TH": "th",
+    "JP": "ja",   # 일본 미진출 판별 시 일본 내 유사 영상 검색용
 }
 
 

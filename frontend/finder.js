@@ -462,6 +462,15 @@
     $("f-estimate").addEventListener("click", estimate);
     $("f-search").addEventListener("click", startSearch);
     $("f-refresh").addEventListener("click", refreshGrid);
+    $("f-categorize").addEventListener("click", async () => {
+      try { const r = await jsend("POST", "/categorize", { limit: 40 }); alert(r.message); }
+      catch (e) { alert("실패: " + e.message); }
+    });
+    $("f-japan").addEventListener("click", async () => {
+      if (!confirm("배수 상위 영상의 일본 미진출 여부를 판별합니다. YouTube 쿼터를 사용합니다. 계속할까요?")) return;
+      try { const r = await jsend("POST", "/japan_check", {}); alert(r.message); refreshQuota(); }
+      catch (e) { alert("실패: " + e.message); }
+    });
     ["f-sort", "f-mult", "f-minviews", "f-cat-filter"].forEach((id) =>
       $(id).addEventListener("change", refreshGrid));
     ["f-t-unentered", "f-t-small", "f-t-hidewatched"].forEach((id) =>
