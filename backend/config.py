@@ -73,9 +73,33 @@ TARGET_PEAK_DB = _get_float("TARGET_PEAK_DB", -1.0)
 # --- APIs ---
 ANTHROPIC_API_KEY = _get_str("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = _get_str("ANTHROPIC_MODEL", "claude-sonnet-5")
+# Cheap/fast model for the 소재 찾기 tab (category classification, keyword
+# extraction, JP translation for the "일본 미진출" check). Never used by the
+# dubbing pipeline, which keeps ANTHROPIC_MODEL.
+ANTHROPIC_MODEL_CHEAP = _get_str("ANTHROPIC_MODEL_CHEAP", "claude-haiku-4-5")
 ELEVENLABS_API_KEY = _get_str("ELEVENLABS_API_KEY")
 ELEVEN_VOICE_ID = _get_str("ELEVEN_VOICE_ID")
 ELEVEN_MODEL = _get_str("ELEVEN_MODEL", "eleven_multilingual_v2")
+
+# --- 소재 찾기 (finder) tab ---
+# The finder keeps its own SQLite DB and settings; these are only the INITIAL
+# defaults / secrets read from .env. Most are editable at runtime in the UI
+# (stored in data/finder.db → settings table), which overrides these.
+FINDER_DB = DATA_DIR / "finder.db"
+YOUTUBE_API_KEY = _get_str("YOUTUBE_API_KEY")
+TELEGRAM_BOT_TOKEN = _get_str("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = _get_str("TELEGRAM_CHAT_ID")
+
+FINDER_VIEW_FLOOR = int(_get_float("FINDER_VIEW_FLOOR", 3_000_000))   # 조회수 하한 기본 300만
+FINDER_PER_KEYWORD = int(_get_float("FINDER_PER_KEYWORD", 50))        # 키워드당 수집량 (최대 100)
+FINDER_PERIOD_DAYS = int(_get_float("FINDER_PERIOD_DAYS", 14))        # 기본 검색 기간 2주
+FINDER_REGIONS = [r.strip().upper() for r in
+                  _get_str("FINDER_REGIONS",
+                           "US,GB,CA,AU,DE,FR,ES,BR,MX,ID").split(",") if r.strip()]
+FINDER_SCAN_HOURS = int(_get_float("FINDER_SCAN_HOURS", 6))           # 레퍼런스 채널 자동 스캔 주기
+FINDER_MORNING_HOUR = int(_get_float("FINDER_MORNING_HOUR", 7))       # 아침 자동수집 시각
+FINDER_QUOTA_LIMIT = int(_get_float("FINDER_QUOTA_LIMIT", 10_000))    # YouTube Data API 일일 한도
+FINDER_JAPAN_CHECK_TOP_N = int(_get_float("FINDER_JAPAN_CHECK_TOP_N", 20))
 
 
 # Set by start.bat so the server opens the browser itself (avoids fragile

@@ -5,8 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>일본어 쇼츠 더빙 자동화</title>
   <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/finder.css" />
 </head>
 <body>
+  <!-- 최상단 탭 바 (기존 더빙 화면은 그대로 tab-dubbing 안에 감쌈) -->
+  <div class="apptabs">
+    <button class="apptab active" data-app="dubbing">🎬 일본어 더빙</button>
+    <button class="apptab" data-app="finder">🔎 소재 찾기</button>
+  </div>
+
+  <div id="tab-dubbing">
   <header>
     <h1>🎬 일본어 영화쇼츠 더빙 — 자동 파이프라인</h1>
     <p class="sub">업로드 → ① 자막추출(Vision) → ② 일본어 → ③ TTS/QA → ④ 메타데이터</p>
@@ -124,7 +132,121 @@
       <div id="meta-result"></div>
     </section>
   </main>
+  </div><!-- /tab-dubbing -->
+
+  <!-- ===== 소재 찾기 탭 ===== -->
+  <div id="tab-finder" hidden>
+    <header class="f-header">
+      <div>
+        <h1>🔎 소재 찾기 — 해외 인기 쇼츠</h1>
+        <p class="sub">한·일 제외 · 180초 이하 · 국가 분산 검색으로 터질 소재를 모읍니다.</p>
+      </div>
+      <div class="f-topbar">
+        <span id="f-quota" class="f-quota">쿼터 –</span>
+        <button id="f-settings-btn" class="f-linkbtn">⚙ 설정</button>
+      </div>
+    </header>
+
+    <div id="f-health" class="f-health"></div>
+
+    <!-- 설정 -->
+    <section class="f-card" id="f-settings" hidden>
+      <h2>설정 · API 키</h2>
+      <div class="f-row"><label>YouTube API 키</label>
+        <input id="f-yt-key" type="password" placeholder="AIza... (저장되어 있으면 비워두면 유지)" />
+        <button id="f-validate">키 검사</button><span id="f-yt-status" class="f-inline"></span></div>
+      <div class="f-grid2">
+        <div><label>Telegram 봇 토큰(선택)</label><input id="f-tg-token" type="password" /></div>
+        <div><label>Telegram Chat ID(선택)</label><input id="f-tg-chat" type="text" /></div>
+      </div>
+      <div class="f-grid">
+        <div><label>조회수 하한</label><input id="f-set-floor" type="number" /></div>
+        <div><label>키워드당 수집(≤100)</label><input id="f-set-perkw" type="number" min="1" max="100" /></div>
+        <div><label>아침 자동수집 시각(0~23)</label><input id="f-set-morning" type="number" min="0" max="23" /></div>
+        <div><label>레퍼런스 스캔 주기(h)</label><input id="f-set-scan" type="number" min="1" /></div>
+      </div>
+      <div class="f-row"><label>국가(쉼표구분, ISO 코드)</label>
+        <input id="f-set-regions" type="text" placeholder="US,GB,CA,AU,DE,FR,ES,BR,MX,ID" /></div>
+      <div class="f-row"><label class="f-check"><input id="f-set-morning-en" type="checkbox" />
+        아침 지정 시각 자동수집 사용 <span class="hint">(그 시각에 PC가 켜져 있어야 동작)</span></label></div>
+      <div class="f-actions"><button id="f-save-settings" class="f-primary">저장</button>
+        <span id="f-settings-msg" class="f-inline"></span></div>
+    </section>
+
+    <!-- 검색 -->
+    <section class="f-card">
+      <h2>검색</h2>
+      <div class="f-row"><label>카테고리 묶음 (선택 시 저장된 키워드 일괄 검색)</label>
+        <div id="f-categories" class="f-chips"></div></div>
+      <div class="f-row"><label>직접 키워드 (쉼표로 구분)</label>
+        <input id="f-keywords" type="text" placeholder="예: genius idea, plot twist" /></div>
+      <div class="f-grid">
+        <div><label>기간</label><select id="f-period">
+          <option value="1d">1일</option><option value="3d">3일</option>
+          <option value="1w">1주</option><option value="2w" selected>2주</option>
+          <option value="1m">1달</option><option value="3m">3달</option>
+          <option value="all">전체</option></select></div>
+        <div><label>기준</label><select id="f-order">
+          <option value="viewCount">인기(조회수순)</option><option value="date">최신</option></select></div>
+        <div><label>키워드당 수집</label><input id="f-perkw" type="number" value="50" min="1" max="100" /></div>
+        <div><label>조회수 하한</label><input id="f-floor" type="number" placeholder="설정값 사용" /></div>
+      </div>
+      <div class="f-actions">
+        <button id="f-estimate">예상 쿼터 계산</button>
+        <span id="f-estimate-out" class="f-inline"></span>
+        <button id="f-search" class="f-primary">일괄 검색 시작</button>
+      </div>
+      <div id="f-search-log" class="f-log" hidden></div>
+    </section>
+
+    <!-- 결과 -->
+    <section class="f-card">
+      <div class="f-toolbar">
+        <select id="f-sort" title="정렬">
+          <option value="views">조회수</option>
+          <option value="sub_multiple">구독자대비 배수</option>
+          <option value="chan_avg_multiple">채널평균대비 배수</option>
+          <option value="like_rate">좋아요율</option>
+          <option value="daily_views">하루평균 조회수</option>
+          <option value="recent">최신</option></select>
+        <select id="f-mult" title="배수 필터">
+          <option value="0">배수 전체</option><option value="2">×2↑</option>
+          <option value="3">×3↑</option><option value="5">×5↑</option>
+          <option value="10">×10↑</option><option value="30">×30↑</option></select>
+        <select id="f-minviews" title="조회수 하한">
+          <option value="0">조회수 전체</option><option value="100000">10만↑</option>
+          <option value="500000">50만↑</option><option value="1000000">100만↑</option>
+          <option value="3000000">300만↑</option><option value="5000000">500만↑</option>
+          <option value="10000000">1000만↑</option></select>
+        <select id="f-cat-filter" title="카테고리"><option value="">카테고리 전체</option></select>
+        <label class="f-check"><input type="checkbox" id="f-t-unentered" /> 일본 미진출만</label>
+        <label class="f-check"><input type="checkbox" id="f-t-small" /> 작은 채널만</label>
+        <label class="f-check"><input type="checkbox" id="f-t-hidewatched" /> 본 영상 숨기기</label>
+        <button id="f-refresh">새로고침</button>
+        <a id="f-export" class="f-linkbtn" href="#">CSV 내보내기</a>
+        <span id="f-count" class="f-count"></span>
+      </div>
+      <div id="f-grid" class="f-videogrid"></div>
+      <div id="f-empty" class="f-empty" hidden>아직 수집된 영상이 없습니다. 위에서 검색을 실행하세요.</div>
+    </section>
+
+    <!-- 레퍼런스 채널 -->
+    <section class="f-card">
+      <h2>레퍼런스 채널 <button id="f-scan-all" class="f-linkbtn">전체 스캔</button>
+        <span class="hint">등록 채널의 새 영상을 적은 쿼터로 수집</span></h2>
+      <div id="f-channels" class="f-channels"></div>
+    </section>
+  </div><!-- /tab-finder -->
+
+  <!-- 영상 미리보기 모달 -->
+  <div id="f-modal" class="f-modal" hidden>
+    <div class="f-modal-inner">
+      <button id="f-modal-close" class="f-modal-close">✕</button>
+      <div id="f-modal-body"></div>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
+  <script src="/finder.js"></script>
 </body>
 </html>
