@@ -50,14 +50,20 @@ def _parse_fps(rate: str) -> float:
         return 0.0
 
 
-def download_url(url: str, dest_dir: Path) -> tuple[Path, str]:
-    """Download a video via yt-dlp into dest_dir. Returns (path, title)."""
+def download_url(url: str, dest_dir: Path, fmt: str | None = None) -> tuple[Path, str]:
+    """Download a video via yt-dlp into dest_dir. Returns (path, title).
+
+    ``fmt`` overrides the yt-dlp format selector. When omitted the default is
+    unchanged (so the dubbing pipeline behaves exactly as before). Callers that
+    need guaranteed audio (e.g. the 소재 찾기 "작업하기" download) pass
+    "bestvideo+bestaudio/best" so video+audio are always merged.
+    """
     from yt_dlp import YoutubeDL  # imported here so the app still starts without it
 
     out_tmpl = str(dest_dir / "source.%(ext)s")
     ydl_opts = {
         "outtmpl": out_tmpl,
-        "format": "mp4/bestvideo+bestaudio/best",
+        "format": fmt or "mp4/bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
