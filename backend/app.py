@@ -27,6 +27,7 @@ from . import config, store
 from .finder import db as finder_db
 from .finder import scheduler as finder_scheduler
 from .finder.routes import router as finder_router
+from .produce.routes import router as produce_router
 from .models import Job, SegmentsUpdate, VideoMeta
 from .pipeline import (assemble, audio_qa, download, import_parse, metadata_gen,
                        translate, tts, vision)
@@ -74,6 +75,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="JP Shorts Dubber", lifespan=lifespan)
 app.include_router(finder_router)
+app.include_router(produce_router)
 
 
 @app.middleware("http")

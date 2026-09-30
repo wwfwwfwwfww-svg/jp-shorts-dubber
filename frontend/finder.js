@@ -44,15 +44,16 @@
 
   // ---------- 탭 전환 ----------
   function switchApp(which) {
-    const dub = $("tab-dubbing"), fin = $("tab-finder");
+    const panels = { dubbing: "tab-dubbing", finder: "tab-finder", produce: "tab-produce" };
     document.querySelectorAll(".apptab").forEach((b) =>
       b.classList.toggle("active", b.dataset.app === which));
+    Object.entries(panels).forEach(([k, id]) => {
+      const el = $(id); if (el) el.hidden = (k !== which);
+    });
     if (which === "finder") {
-      dub.hidden = true; fin.hidden = false;
-      if (!loaded) { loaded = true; initFinder(); }
-      else { refreshQuota(); }
-    } else {
-      dub.hidden = false; fin.hidden = true;
+      if (!loaded) { loaded = true; initFinder(); } else { refreshQuota(); }
+    } else if (which === "produce" && typeof window.__produceInit === "function") {
+      window.__produceInit();
     }
   }
 
@@ -298,6 +299,7 @@
           <button data-act="register">채널등록</button>
           <button data-act="exclude">제외</button>
           <button data-act="work" class="f-primary-mini">작업하기</button>
+          <button data-act="produce">제작으로</button>
           <a href="https://youtu.be/${v.video_id}" target="_blank" rel="noopener">유튜브</a>
         </div>
       </div>`;
@@ -323,6 +325,8 @@
         loadChannels();
       } else if (act === "work") {
         await workVideo(v);
+      } else if (act === "produce") {
+        if (typeof window.__produceFromFinder === "function") window.__produceFromFinder(v.video_id);
       }
     } catch (e) { alert("실패: " + e.message); }
   }
