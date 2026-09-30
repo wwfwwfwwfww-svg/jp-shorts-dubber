@@ -43,7 +43,9 @@ def download_video(video_id: str) -> dict:
     dest = WORK_DIR / video_id
     dest.mkdir(parents=True, exist_ok=True)
     try:
-        path, _title = download.download_url(f"https://youtu.be/{video_id}", dest)
+        # 소리가 항상 포함되도록 영상+오디오 병합 포맷을 강제(무음 다운로드 방지).
+        path, _title = download.download_url(
+            f"https://youtu.be/{video_id}", dest, fmt="bestvideo+bestaudio/best")
     except Exception as e:
         return {"ok": False, "error": f"다운로드 실패: {e}"}
     return {"ok": True, "file": str(path), "handoff": handoff_payload(video, str(path))}
