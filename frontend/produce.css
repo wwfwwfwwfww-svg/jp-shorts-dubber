@@ -1,0 +1,27 @@
+/* 제작(자막교체) 탭 전용. style.css 변수 + finder.css의 .f-* 클래스를 재사용한다.
+   모든 선택자는 #tab-produce / .p-* 범위로 한정. */
+
+#tab-produce { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+.p-seglist { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow: auto; }
+.p-seg { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: start;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.p-seg .t { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.p-seg textarea { width: 100%; box-sizing: border-box; background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px; font-size: 13px; resize: vertical; }
+.p-seg .en { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.p-seg .kr { color: var(--muted); font-size: 11px; margin-top: 3px; }
+
+.p-render-grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+.p-preview { position: sticky; top: 8px; align-self: start; }
+.p-vidwrap { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
+.p-vidwrap video { width: 100%; display: block; }
+.p-band { position: absolute; left: 0; width: 100%; background: rgba(255,60,60,.35);
+  border-top: 1px solid #ff3c3c; border-bottom: 1px solid #ff3c3c; pointer-events: none; }
+
+.p-outvid { width: 100%; max-width: 420px; border-radius: 8px; background: #000; display: block; }
+
+@media (max-width: 760px) {
+  .p-render-grid { grid-template-columns: 1fr; }
+  .p-preview { position: static; }
+}

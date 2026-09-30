@@ -6,12 +6,14 @@
   <title>일본어 쇼츠 더빙 자동화</title>
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/finder.css" />
+  <link rel="stylesheet" href="/produce.css" />
 </head>
 <body>
   <!-- 최상단 탭 바 (기존 더빙 화면은 그대로 tab-dubbing 안에 감쌈) -->
   <div class="apptabs">
     <button class="apptab active" data-app="dubbing">🎬 일본어 더빙</button>
     <button class="apptab" data-app="finder">🔎 소재 찾기</button>
+    <button class="apptab" data-app="produce">🎬 제작(자막교체)</button>
   </div>
 
   <div id="tab-dubbing">
@@ -247,6 +249,71 @@
     </section>
   </div><!-- /tab-finder -->
 
+  <!-- ===== 제작(자막교체) 탭 ===== -->
+  <div id="tab-produce" hidden>
+    <header class="f-header">
+      <div>
+        <h1>🎬 제작 — 자막 교체</h1>
+        <p class="sub">음악+영어자막 영상의 자막만 일본어로. 원본 소리는 그대로. (전부 로컬·무료)</p>
+      </div>
+      <div class="f-topbar"><span id="p-health" class="f-inline"></span></div>
+    </header>
+
+    <!-- 1. 입력 -->
+    <section class="f-card" id="p-card-input">
+      <h2>1. 원본 영상</h2>
+      <div class="f-row"><label>MP4 업로드</label><input type="file" id="p-file" accept="video/*" /></div>
+      <p class="hint">소재 찾기 카드의 “제작으로 보내기”로 넘어올 수도 있어요. (자막 인식에 Claude 키 필요)</p>
+      <div class="f-actions"><button id="p-upload" class="f-primary">업로드 → 자막 인식</button>
+        <span id="p-input-msg" class="f-inline"></span></div>
+    </section>
+
+    <div id="p-progress" class="f-log" hidden></div>
+
+    <!-- 2. 자막 인식 -->
+    <section class="f-card" id="p-card-src" hidden>
+      <h2>2. 인식된 자막 확인/수정 <span class="hint">(화면에 박힌 영어 원문)</span></h2>
+      <div id="p-src-segs" class="p-seglist"></div>
+      <div class="f-actions"><button id="p-save-src">수정 저장</button>
+        <button id="p-to-translate" class="f-primary">일본어 번역 →</button>
+        <span id="p-src-msg" class="f-inline"></span></div>
+    </section>
+
+    <!-- 3. 번역 + 가릴 띠 -->
+    <section class="f-card" id="p-card-ja" hidden>
+      <h2>3. 일본어 자막 + 가릴 자막 띠</h2>
+      <div class="p-render-grid">
+        <div class="p-preview">
+          <div class="p-vidwrap"><video id="p-video" muted playsinline></video>
+            <div id="p-band" class="p-band"></div></div>
+          <div class="f-grid2">
+            <div><label>가릴 띠 위쪽</label><input type="range" id="p-band-top" min="0" max="0.95" step="0.01" /></div>
+            <div><label>가릴 띠 아래쪽</label><input type="range" id="p-band-bottom" min="0.05" max="1" step="0.01" /></div>
+          </div>
+          <div class="f-grid2">
+            <div><label>가리기 방식</label><select id="p-cover">
+              <option value="box">어두운 띠</option><option value="blur">블러</option></select></div>
+            <div><label>자막 크기</label><input type="range" id="p-fontscale" min="0.6" max="1.6" step="0.05" value="1" /></div>
+          </div>
+          <p class="hint">빨간 영역 = 가려질 원본 영어 자막 위치. 슬라이더로 맞추세요.</p>
+        </div>
+        <div class="p-segs"><div id="p-ja-segs" class="p-seglist"></div></div>
+      </div>
+      <div class="f-actions"><button id="p-save-ja">자막 저장</button>
+        <button id="p-render" class="f-primary">렌더 → 결과 만들기</button>
+        <span id="p-ja-msg" class="f-inline"></span></div>
+    </section>
+
+    <!-- 4. 결과 -->
+    <section class="f-card" id="p-card-out" hidden>
+      <h2>4. 결과</h2>
+      <video id="p-out-video" controls class="p-outvid"></video>
+      <div class="f-actions"><a id="p-download" class="f-linkbtn" href="#">⬇ 다운로드</a>
+        <button id="p-restart">새 영상 작업</button></div>
+      <p class="note">⚠ 업로드 전: 비공개로 올려 YouTube Studio 저작권 검사를 통과했는지 확인 후 공개하세요.</p>
+    </section>
+  </div><!-- /tab-produce -->
+
   <!-- 영상 미리보기 모달 -->
   <div id="f-modal" class="f-modal" hidden>
     <div class="f-modal-inner">
@@ -257,5 +324,6 @@
 
   <script src="/app.js"></script>
   <script src="/finder.js"></script>
+  <script src="/produce.js"></script>
 </body>
 </html>
