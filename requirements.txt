@@ -22,3 +22,8 @@ anthropic>=0.39
 elevenlabs>=1.0
 pydub>=0.25
 soundfile>=0.12
+
+# --- 소재 찾기 탭 (YouTube 검색·수집) ---
+httpx>=0.27          # YouTube Data API v3 HTTP 호출
+apscheduler>=3.10    # 아침 자동수집 / 레퍼런스 채널 주기 스캔
+# SQLite는 파이썬 표준 라이브러리(sqlite3)라 별도 설치 불필요.

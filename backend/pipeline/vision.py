@@ -17,6 +17,7 @@ import cv2
 from PIL import Image, ImageDraw, ImageFont
 
 from .. import config
+from ..common import llm
 from ..models import Segment
 from . import frames as frames_util
 
@@ -105,10 +106,7 @@ def build_contact_sheets(frame_paths, top, bottom, interval, out_dir) -> List[Tu
 
 
 def _client():
-    import anthropic
-    if not config.ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY가 설정되지 않았습니다 (.env 확인).")
-    return anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    return llm.client()
 
 
 def _detect_crop(client, frame_paths, out_dir) -> tuple:

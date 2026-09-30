@@ -9,10 +9,10 @@ the model's own count is never trusted.
 from __future__ import annotations
 
 import json
-import re
 from typing import List, Optional, Tuple
 
 from .. import config
+from ..common import llm
 from ..models import Job, Segment
 
 # Characters that do NOT count toward the budget (whitespace + punctuation).
@@ -23,35 +23,15 @@ def count_chars(text: str) -> int:
     return sum(1 for ch in (text or "") if ch not in _PUNCT and not ch.isspace())
 
 
+# The Anthropic client + JSON helpers now live in ``common.llm`` (shared with the
+# 소재 찾기 tab). These thin aliases keep the original names/behaviour so every
+# existing import (``from .translate import msg_text`` etc.) still works unchanged.
 def _client():
-    import anthropic
-    if not config.ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY가 설정되지 않았습니다 (.env 확인).")
-    return anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    return llm.client()
 
 
-def msg_text(msg) -> str:
-    """Concatenate text blocks, skipping thinking blocks (models may emit thinking)."""
-    return "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", "") == "text")
-
-
-def _extract_json(text: str):
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
-    start = min([i for i in (text.find("["), text.find("{")) if i != -1], default=-1)
-    if start == -1:
-        raise ValueError("응답에서 JSON을 찾지 못했습니다.")
-    open_ch = text[start]
-    close_ch = "]" if open_ch == "[" else "}"
-    depth = 0
-    for i in range(start, len(text)):
-        if text[i] == open_ch:
-            depth += 1
-        elif text[i] == close_ch:
-            depth -= 1
-            if depth == 0:
-                return json.loads(text[start:i + 1])
-    return json.loads(text[start:])
+msg_text = llm.msg_text
+_extract_json = llm.extract_json
 
 
 def _system_prompt() -> str:

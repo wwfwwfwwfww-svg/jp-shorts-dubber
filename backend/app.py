@@ -24,6 +24,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config, store
+from .finder import db as finder_db
+from .finder import scheduler as finder_scheduler
+from .finder.routes import router as finder_router
 from .models import Job, SegmentsUpdate, VideoMeta
 from .pipeline import (assemble, audio_qa, download, import_parse, metadata_gen,
                        translate, tts, vision)
@@ -55,12 +58,22 @@ def _safe_name(name: str) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        finder_db.init_db()          # 소재 찾기 탭용 SQLite 준비(기존 잡 스토어와 분리)
+        finder_scheduler.start()     # 레퍼런스 자동스캔 + 아침 자동수집(설정 시)
+    except Exception:
+        pass                          # 파인더 초기화 실패가 더빙 파이프라인을 막지 않도록
     if config.OPEN_BROWSER:
         threading.Timer(1.0, lambda: webbrowser.open("http://localhost:8000")).start()
     yield
+    try:
+        finder_scheduler.shutdown()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="JP Shorts Dubber", lifespan=lifespan)
+app.include_router(finder_router)
 
 
 @app.middleware("http")
