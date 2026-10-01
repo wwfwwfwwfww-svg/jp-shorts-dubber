@@ -23,6 +23,9 @@ WORK = ROOT / "work"
 WORK.mkdir(exist_ok=True)
 STATIC = ROOT / "static"
 
+# 화면/서버가 같은 코드인지 바로 확인하기 위한 빌드 표식. 코드 바뀔 때마다 올림.
+BUILD = "v5 (2026-10-01 속도·타임스크롤)"
+
 app = FastAPI(title="자막 지우개")
 
 
@@ -73,15 +76,28 @@ async def upload(file: UploadFile = File(...)):
     try:
         w, h = inpaint.first_frame(str(src), str(d / "frame.jpg"))
         dur = inpaint.duration(str(src))
+        fps = inpaint.fps(str(src))
     except Exception as e:
         raise HTTPException(400, f"영상을 읽지 못했습니다: {e}")
-    _set(jid, status="uploaded", width=w, height=h, duration=dur)
-    return {"id": jid, "width": w, "height": h, "duration": dur}
+    _set(jid, status="uploaded", width=w, height=h, duration=dur, fps=fps)
+    return {"id": jid, "width": w, "height": h, "duration": dur, "fps": fps}
+
+
+@app.get("/api/version")
+def version():
+    return {"build": BUILD}
 
 
 @app.get("/api/{jid}/frame")
-def frame(jid: str, t: float | None = None):
+def frame(jid: str, t: float | None = None, pos: float | None = None):
     src = WORK / jid / "source.mp4"
+    # pos(0~1, 길이 비율): 길이를 몰라도 되는 가장 튼튼한 타임스크롤 경로.
+    if pos is not None and src.exists():
+        try:
+            data = inpaint.frame_at_ratio(str(src), float(pos))
+            return Response(content=data, media_type="image/jpeg")
+        except Exception:
+            pass
     if t is not None and t > 0 and src.exists():
         try:
             data = inpaint.frame_at(str(src), float(t))
