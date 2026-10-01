@@ -4,6 +4,13 @@ cd /d "%~dp0subtitle-remover"
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 
+echo ============================================================
+echo   RUNNING FROM THIS FOLDER:
+echo   %~dp0
+echo   (Update this SAME folder. If this path is not the one you
+echo    updated, you have more than one copy - use only this one.)
+echo ============================================================
+
 REM First run: make its own venv (separate from the main app) and install.
 if not exist ".venv\Scripts\python.exe" (
   echo [First-time setup] Creating environment and installing packages - a few minutes...

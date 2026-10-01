@@ -5,6 +5,13 @@ set OPEN_BROWSER=1
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 
+echo ============================================================
+echo   RUNNING FROM THIS FOLDER:
+echo   %~dp0
+echo   (Update this SAME folder. If this path is not the one you
+echo    updated, you have more than one copy - use only this one.)
+echo ============================================================
+
 REM ============================================================
 REM  First run: auto-create the .venv and install packages.
 REM  Already set up: just activate. (Nothing for the user to do.)
