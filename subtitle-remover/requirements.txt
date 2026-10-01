@@ -1,0 +1,7 @@
+# 자막 지우개(별도 앱) 의존성 — GPU/torch 불필요(가벼움)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+opencv-python>=4.9
+numpy>=1.26
+# ffmpeg/ffprobe는 시스템 PATH 사용(별도 설치 아님)

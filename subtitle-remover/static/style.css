@@ -1,0 +1,41 @@
+:root {
+  --bg: #0f1115; --card: #171a21; --line: #2a2f3a; --text: #e8eaed;
+  --muted: #9aa3b2; --accent: #5b8cff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif; }
+header { padding: 18px 16px 6px; max-width: 980px; margin: 0 auto; }
+header h1 { margin: 0; font-size: 22px; }
+header .sub { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+main { max-width: 980px; margin: 0 auto; padding: 8px 16px 40px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px; margin: 14px 0; }
+.card h2 { font-size: 15px; margin: 0 0 12px; }
+.hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+.row { margin: 10px 0; }
+.row label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.actions.col { flex-direction: column; align-items: stretch; }
+.msg { font-size: 13px; color: var(--muted); }
+
+input[type=file], input[type=range] { width: 100%; }
+button, a.primary { background: var(--line); color: var(--text); border: none;
+  border-radius: 8px; padding: 9px 14px; font-size: 14px; cursor: pointer; text-decoration: none; }
+button:hover { filter: brightness(1.15); }
+.primary { background: var(--accent); color: #fff; font-weight: 600; }
+.big { padding: 12px; font-size: 15px; }
+
+.editwrap { display: grid; grid-template-columns: 1fr 230px; gap: 16px; align-items: start; }
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden;
+  display: inline-block; line-height: 0; width: 100%; }
+.stage img { width: 100%; display: block; }
+.stage canvas { position: absolute; left: 0; top: 0; cursor: crosshair; }
+.side { display: flex; flex-direction: column; gap: 6px; }
+
+.log { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px; font-size: 13px; color: var(--muted); margin: 12px 0; white-space: pre-wrap; }
+#result { width: 100%; max-width: 420px; border-radius: 8px; background: #000; display: block; }
+
+@media (max-width: 720px) { .editwrap { grid-template-columns: 1fr; } }

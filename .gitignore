@@ -8,6 +8,8 @@ __pycache__/
 
 # --- Work data: uploaded videos, generated audio, outputs (per-job dirs) ---
 data/
+# 자막 지우개 작업 폴더(업로드/결과)
+subtitle-remover/work/
 
 # --- Media files (belt-and-suspenders; job media lives under data/ anyway) ---
 *.mp4
