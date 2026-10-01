@@ -9,11 +9,14 @@ import os
 import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from itertools import islice
 from pathlib import Path
 from typing import Callable, List, Optional
 
 import cv2
 import numpy as np
+
+import ai_engine  # torch/LaMa는 지연 import이므로 여기서 불러도 가벼움
 
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 FFPROBE = shutil.which("ffprobe") or "ffprobe"
@@ -164,97 +167,40 @@ def _mask_bbox(mask: np.ndarray, pad: int) -> Optional[tuple[int, int, int, int]
     return x1, y1, x2, y2
 
 
-def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
-            max_side: int = 720, target_fps: float = 30.0,
-            progress: Optional[Callable[[str], None]] = None) -> None:
-    """박스 영역을 지운다.
-
-    max_side: 결과의 짧은 변(세로영상=가로) 상한 px. 원본이 더 크면 축소(0=원본 유지).
-    target_fps: 결과 프레임레이트 상한(원본이 더 높으면 프레임을 건너뛰어 맞춤, 0=원본).
-    축소·프레임감소로 처리량을 크게 줄여 속도를 올린다(캡컷 720p·30fps 내보내기와 동일 취지).
-    """
-    cap = cv2.VideoCapture(src)
-    if not cap.isOpened():
-        raise RuntimeError("영상을 열 수 없습니다.")
-    sw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    sh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    sfps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-
-    # 출력 해상도(짝수 보정; libx264 yuv420p 요구)
+def _scaled_dims(sw: int, sh: int, max_side: int) -> tuple[int, int]:
+    """짧은 변이 max_side를 넘으면 축소(짝수 보정; libx264 yuv420p 요구). 0이면 원본."""
     if max_side and min(sw, sh) > max_side:
         scale = float(max_side) / float(min(sw, sh))
         ow = max(2, int(round(sw * scale / 2)) * 2)
         oh = max(2, int(round(sh * scale / 2)) * 2)
-    else:
-        ow, oh = sw, sh
-    resize_needed = (ow, oh) != (sw, sh)
+        return ow, oh
+    return sw, sh
 
-    # 출력 fps(원본이 상한보다 높을 때만 프레임 건너뜀)
+
+def _fps_step(sfps: float, target_fps: float) -> int:
+    """원본이 상한보다 빠를 때만 프레임 건너뛸 간격."""
     if target_fps and sfps > target_fps + 0.1:
-        step = max(1, int(round(sfps / target_fps)))
-    else:
-        step = 1
-    ofps = (sfps / step) if step > 1 else sfps
-    expected = (total // step) if total else 0
+        return max(1, int(round(sfps / target_fps)))
+    return 1
 
-    mask = build_mask(ow, oh, boxes)   # 출력 해상도 기준
-    if not mask.any():
-        cap.release()
-        raise RuntimeError("지울 영역이 없습니다. 박스를 지정하세요.")
-    radius = max(1, min(30, int(radius)))
 
-    # 전체 화면이 아니라 "지울 네모를 감싸는 영역만" inpaint → 추가 속도 향상.
-    pad = radius + 8
-    x1, y1, x2, y2 = _mask_bbox(mask, pad)  # mask.any()이므로 None 아님
-    mask_roi = np.ascontiguousarray(mask[y1:y2, x1:x2])
+def _iter_frames(cap, step: int, resize_needed: bool, ow: int, oh: int):
+    """프레임을 step 간격으로 건너뛰며(필요시 축소) 하나씩 내보낸다."""
+    idx = 0
+    while True:
+        ok, fr = cap.read()
+        if not ok:
+            break
+        if idx % step == 0:
+            if resize_needed:
+                fr = cv2.resize(fr, (ow, oh), interpolation=cv2.INTER_AREA)
+            yield fr
+        idx += 1
 
-    def fill(fr: np.ndarray) -> np.ndarray:
-        roi = np.ascontiguousarray(fr[y1:y2, x1:x2])
-        fr[y1:y2, x1:x2] = cv2.inpaint(roi, mask_roi, radius, cv2.INPAINT_TELEA)
-        return fr
 
-    silent = str(Path(out_mp4).with_name("silent.mp4"))
-    vw = cv2.VideoWriter(silent, cv2.VideoWriter_fourcc(*"mp4v"), ofps, (ow, oh))
-    if not vw.isOpened():
-        cap.release()
-        raise RuntimeError("출력 영상을 만들 수 없습니다.")
-
-    # cv2.inpaint는 GIL을 풀어 여러 코어로 병렬 처리 가능. 메모리 보호 위해 청크 단위.
-    workers = max(1, min(6, (os.cpu_count() or 2)))
-    chunk = max(8, workers * 3)
-    tag = f"{ow}x{oh}·{ofps:.0f}fps"  # 실제 처리 해상도/프레임레이트(화면에 표시 → 버전 확인용)
-    if progress:
-        progress(f"{tag} 처리 시작 — 0/{expected or '?'} 프레임")
-    i = 0           # 기록한 프레임 수
-    read_idx = 0    # 읽은 원본 프레임 인덱스(프레임 건너뛰기용)
-    try:
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            while True:
-                frames = []
-                while len(frames) < chunk:
-                    ok, fr = cap.read()
-                    if not ok:
-                        break
-                    if read_idx % step == 0:
-                        if resize_needed:
-                            fr = cv2.resize(fr, (ow, oh), interpolation=cv2.INTER_AREA)
-                        frames.append(fr)
-                    read_idx += 1
-                if not frames:
-                    break
-                for out in ex.map(fill, frames):  # 순서 보존
-                    vw.write(out)
-                i += len(frames)
-                if progress:
-                    progress(f"{tag}  {i}/{expected or '?'} 프레임 지우는 중...")
-    finally:
-        cap.release()
-        vw.release()
-    if i == 0:
-        raise RuntimeError("처리된 프레임이 없습니다.")
-
-    # 원본 오디오를 다시 입혀서 최종 mp4(h264, 브라우저 호환)
+def _remux_audio(silent: str, src: str, out_mp4: str,
+                 progress: Optional[Callable[[str], None]] = None) -> None:
+    """무음 결과에 원본 오디오를 입혀 브라우저 호환 mp4(h264)로 저장."""
     if progress:
         progress("오디오 합치고 마무리 중...")
     cmd = [FFMPEG, "-y", "-i", silent, "-i", src,
@@ -268,9 +214,130 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
     except FileNotFoundError:
         ok = False  # ffmpeg 미설치 등
     if not ok:
-        # ffmpeg 실패/부재 시 무음 영상이라도 결과로 제공
-        shutil.copyfile(silent, out_mp4)
+        shutil.copyfile(silent, out_mp4)  # ffmpeg 실패/부재 시 무음본이라도 제공
     try:
         Path(silent).unlink()
     except OSError:
         pass
+
+
+def _run_video(src: str, out_mp4: str, boxes: List[dict], max_side: int, target_fps: float,
+               make_fill, parallel: bool, label: str,
+               progress: Optional[Callable[[str], None]]) -> None:
+    """공통 뼈대: 열기→다운스케일/fps→마스크→프레임 처리(fill)→오디오 합치기.
+
+    make_fill(mask, ow, oh) -> fill(frame)->frame : 엔진별 프레임 처리 함수를 만들어 반환.
+    parallel : cv2처럼 스레드풀 병렬이면 True, AI(GPU 모델)처럼 순차면 False.
+    """
+    cap = cv2.VideoCapture(src)
+    if not cap.isOpened():
+        raise RuntimeError("영상을 열 수 없습니다.")
+    sw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    sh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    sfps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+
+    ow, oh = _scaled_dims(sw, sh, max_side)
+    resize_needed = (ow, oh) != (sw, sh)
+    step = _fps_step(sfps, target_fps)
+    ofps = (sfps / step) if step > 1 else sfps
+    expected = (total // step) if total else 0
+
+    mask = build_mask(ow, oh, boxes)   # 출력 해상도 기준
+    if not mask.any():
+        cap.release()
+        raise RuntimeError("지울 영역이 없습니다. 박스를 지정하세요.")
+
+    fill = make_fill(mask, ow, oh)
+
+    silent = str(Path(out_mp4).with_name("silent.mp4"))
+    vw = cv2.VideoWriter(silent, cv2.VideoWriter_fourcc(*"mp4v"), ofps, (ow, oh))
+    if not vw.isOpened():
+        cap.release()
+        raise RuntimeError("출력 영상을 만들 수 없습니다.")
+
+    tag = (label + " " if label else "") + f"{ow}x{oh}·{ofps:.0f}fps"
+    if progress:
+        progress(f"{tag} 처리 시작 — 0/{expected or '?'} 프레임")
+    i = 0
+    try:
+        gen = _iter_frames(cap, step, resize_needed, ow, oh)
+        if parallel:
+            # cv2.inpaint는 GIL을 풀어 여러 코어 병렬 가능. 메모리 보호 위해 청크 단위.
+            workers = max(1, min(6, (os.cpu_count() or 2)))
+            chunk = max(8, workers * 3)
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                while True:
+                    frames = list(islice(gen, chunk))
+                    if not frames:
+                        break
+                    for out in ex.map(fill, frames):  # 순서 보존
+                        vw.write(out)
+                    i += len(frames)
+                    if progress:
+                        progress(f"{tag}  {i}/{expected or '?'} 프레임 지우는 중...")
+        else:
+            for fr in gen:  # AI: GPU 모델이라 순차
+                vw.write(fill(fr))
+                i += 1
+                if progress and i % 3 == 0:
+                    progress(f"{tag}  {i}/{expected or '?'} 프레임 지우는 중...")
+    finally:
+        cap.release()
+        vw.release()
+    if i == 0:
+        raise RuntimeError("처리된 프레임이 없습니다.")
+
+    _remux_audio(silent, src, out_mp4, progress)
+
+
+def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
+            max_side: int = 720, target_fps: float = 30.0,
+            progress: Optional[Callable[[str], None]] = None) -> None:
+    """[빠름·무료] cv2(TELEA) 인페인팅. 검은 띠 위 글자·단순 배경에 적합.
+
+    max_side: 결과의 짧은 변(세로영상=가로) 상한 px(0=원본). target_fps: fps 상한(0=원본).
+    축소·프레임감소로 처리량을 줄여 속도를 올린다(캡컷 720p·30fps 내보내기와 동일 취지).
+    """
+    radius = max(1, min(30, int(radius)))
+
+    def make_fill(mask, ow, oh):
+        # 전체 화면이 아니라 "지울 네모를 감싸는 영역만" inpaint → 속도 향상.
+        x1, y1, x2, y2 = _mask_bbox(mask, radius + 8)
+        mask_roi = np.ascontiguousarray(mask[y1:y2, x1:x2])
+
+        def fill(fr):
+            roi = np.ascontiguousarray(fr[y1:y2, x1:x2])
+            fr[y1:y2, x1:x2] = cv2.inpaint(roi, mask_roi, radius, cv2.INPAINT_TELEA)
+            return fr
+        return fill
+
+    _run_video(src, out_mp4, boxes, max_side, target_fps,
+               make_fill, parallel=True, label="", progress=progress)
+
+
+def process_ai(src: str, out_mp4: str, boxes: List[dict],
+               max_side: int = 720, target_fps: float = 30.0,
+               progress: Optional[Callable[[str], None]] = None) -> None:
+    """[AI·깔끔] LaMa 인페인팅. 복잡·실사 배경에서도 글자를 제대로 지움(GPU 권장).
+
+    torch/simple-lama-inpainting 설치 필요(AI설치.bat). 네모를 감싸는 ROI만 모델에 넘겨
+    속도·VRAM을 아낀다. GPU 단일 모델이라 순차 처리.
+    """
+    st = ai_engine.status()
+    if not st.get("available"):
+        raise RuntimeError("AI 엔진을 쓸 수 없습니다: " + st.get("reason", "미설치"))
+
+    def make_fill(mask, ow, oh):
+        pad = max(40, int(0.06 * max(ow, oh)))  # LaMa는 주변 맥락이 필요 → 여유 패딩
+        x1, y1, x2, y2 = _mask_bbox(mask, pad)
+        mask_roi = np.ascontiguousarray(mask[y1:y2, x1:x2])
+
+        def fill(fr):
+            roi = np.ascontiguousarray(fr[y1:y2, x1:x2])
+            fr[y1:y2, x1:x2] = ai_engine.inpaint_frame(roi, mask_roi)
+            return fr
+        return fill
+
+    _run_video(src, out_mp4, boxes, max_side, target_fps,
+               make_fill, parallel=False, label="AI(LaMa)", progress=progress)

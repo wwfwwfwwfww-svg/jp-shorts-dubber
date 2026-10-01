@@ -14,6 +14,25 @@
     if ($("build")) $("build").textContent = d.build || "?";
   }).catch(() => { if ($("build")) $("build").textContent = "서버 응답 없음"; });
 
+  // ---------- 엔진(cv2/AI) 가용 여부 ----------
+  fetch("/api/engines").then((r) => r.json()).then((d) => {
+    const sel = $("engine"), note = $("engine-note"), ai = (d && d.ai) || {};
+    const aiOpt = sel && sel.querySelector('option[value="ai"]');
+    if (!aiOpt) return;
+    if (ai.available) {
+      aiOpt.disabled = false;
+      note.textContent = "AI 사용 가능 (" + (ai.gpu || ai.device || "") + "). 복잡한 배경도 깨끗이 지웁니다.";
+    } else {
+      aiOpt.disabled = true;
+      note.textContent = "AI를 쓰려면 AI설치.bat을 먼저 실행하세요. (" + (ai.reason || "미설치") + ")";
+    }
+  }).catch(() => {});
+
+  // 엔진 바꾸면 지우개 세기(cv2 전용)는 숨김
+  $("engine").addEventListener("change", () => {
+    $("radius-row").hidden = $("engine").value === "ai";
+  });
+
   // ---------- 업로드 ----------
   $("upload-btn").addEventListener("click", async () => {
     const f = $("file").files[0];
@@ -160,6 +179,7 @@
         body: JSON.stringify({
           boxes, radius: Number($("radius").value),
           max_side: maxSide, target_fps: maxSide === 0 ? 0 : 30,
+          engine: $("engine").value,
         }),
       });
       const d = await r.json();
