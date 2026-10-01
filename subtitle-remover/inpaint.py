@@ -27,6 +27,49 @@ def first_frame(src: str, out_jpg: str) -> tuple[int, int]:
     return int(fr.shape[1]), int(fr.shape[0])
 
 
+def duration(src: str) -> float:
+    """영상 길이(초). 못 구하면 0.0."""
+    cap = cv2.VideoCapture(src)
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        total = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
+        if fps > 0 and total > 0:
+            return float(total) / float(fps)
+    finally:
+        cap.release()
+    return 0.0
+
+
+def frame_at(src: str, t_sec: float) -> bytes:
+    """t초 시점의 프레임을 jpg 바이트로 반환(미리보기용)."""
+    cap = cv2.VideoCapture(src)
+    try:
+        ok, fr = False, None
+        if t_sec and t_sec > 0:
+            cap.set(cv2.CAP_PROP_POS_MSEC, float(t_sec) * 1000.0)
+            ok, fr = cap.read()
+        if not ok or fr is None:
+            # POS_MSEC 실패 시 프레임 인덱스로 폴백
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+            idx = int(float(t_sec) * fps) if t_sec and t_sec > 0 else 0
+            if total:
+                idx = max(0, min(idx, total - 1))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, fr = cap.read()
+        if not ok or fr is None:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ok, fr = cap.read()
+        if not ok or fr is None:
+            raise RuntimeError("프레임을 읽을 수 없습니다.")
+        ok2, buf = cv2.imencode(".jpg", fr)
+        if not ok2:
+            raise RuntimeError("프레임 인코딩 실패.")
+        return buf.tobytes()
+    finally:
+        cap.release()
+
+
 def build_mask(w: int, h: int, boxes: List[dict]) -> np.ndarray:
     """비율 좌표 박스들 → 흑백 마스크(지울 영역=흰색). 가장자리 살짝 확장."""
     m = np.zeros((h, w), np.uint8)
