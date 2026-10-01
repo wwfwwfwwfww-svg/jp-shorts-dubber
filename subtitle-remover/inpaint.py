@@ -54,6 +54,11 @@ def duration(src: str) -> float:
         total = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
         if fps > 0 and total > 0:
             return float(total) / float(fps)
+        # 끝으로 이동해 타임스탬프 읽기(fps/프레임수가 0인 파일 대비)
+        cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)
+        ms = cap.get(cv2.CAP_PROP_POS_MSEC) or 0.0
+        if ms > 0:
+            return float(ms) / 1000.0
     finally:
         cap.release()
     return 0.0
@@ -118,25 +123,48 @@ def _mask_bbox(mask: np.ndarray, pad: int) -> Optional[tuple[int, int, int, int]
 
 
 def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
+            max_side: int = 720, target_fps: float = 30.0,
             progress: Optional[Callable[[str], None]] = None) -> None:
+    """박스 영역을 지운다.
+
+    max_side: 결과의 짧은 변(세로영상=가로) 상한 px. 원본이 더 크면 축소(0=원본 유지).
+    target_fps: 결과 프레임레이트 상한(원본이 더 높으면 프레임을 건너뛰어 맞춤, 0=원본).
+    축소·프레임감소로 처리량을 크게 줄여 속도를 올린다(캡컷 720p·30fps 내보내기와 동일 취지).
+    """
     cap = cv2.VideoCapture(src)
     if not cap.isOpened():
         raise RuntimeError("영상을 열 수 없습니다.")
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    sw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    sh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    sfps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
 
-    mask = build_mask(w, h, boxes)
+    # 출력 해상도(짝수 보정; libx264 yuv420p 요구)
+    if max_side and min(sw, sh) > max_side:
+        scale = float(max_side) / float(min(sw, sh))
+        ow = max(2, int(round(sw * scale / 2)) * 2)
+        oh = max(2, int(round(sh * scale / 2)) * 2)
+    else:
+        ow, oh = sw, sh
+    resize_needed = (ow, oh) != (sw, sh)
+
+    # 출력 fps(원본이 상한보다 높을 때만 프레임 건너뜀)
+    if target_fps and sfps > target_fps + 0.1:
+        step = max(1, int(round(sfps / target_fps)))
+    else:
+        step = 1
+    ofps = (sfps / step) if step > 1 else sfps
+    expected = (total // step) if total else 0
+
+    mask = build_mask(ow, oh, boxes)   # 출력 해상도 기준
     if not mask.any():
         cap.release()
         raise RuntimeError("지울 영역이 없습니다. 박스를 지정하세요.")
     radius = max(1, min(30, int(radius)))
 
-    # 전체 화면이 아니라 "지울 네모를 감싸는 영역만" inpaint → 대폭 속도 향상.
+    # 전체 화면이 아니라 "지울 네모를 감싸는 영역만" inpaint → 추가 속도 향상.
     pad = radius + 8
-    bbox = _mask_bbox(mask, pad)
-    x1, y1, x2, y2 = bbox  # bbox는 mask.any()이므로 None 아님
+    x1, y1, x2, y2 = _mask_bbox(mask, pad)  # mask.any()이므로 None 아님
     mask_roi = np.ascontiguousarray(mask[y1:y2, x1:x2])
 
     def fill(fr: np.ndarray) -> np.ndarray:
@@ -145,7 +173,7 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
         return fr
 
     silent = str(Path(out_mp4).with_name("silent.mp4"))
-    vw = cv2.VideoWriter(silent, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    vw = cv2.VideoWriter(silent, cv2.VideoWriter_fourcc(*"mp4v"), ofps, (ow, oh))
     if not vw.isOpened():
         cap.release()
         raise RuntimeError("출력 영상을 만들 수 없습니다.")
@@ -153,23 +181,28 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
     # cv2.inpaint는 GIL을 풀어 여러 코어로 병렬 처리 가능. 메모리 보호 위해 청크 단위.
     workers = max(1, min(6, (os.cpu_count() or 2)))
     chunk = max(8, workers * 3)
-    i = 0
+    i = 0           # 기록한 프레임 수
+    read_idx = 0    # 읽은 원본 프레임 인덱스(프레임 건너뛰기용)
     try:
         with ThreadPoolExecutor(max_workers=workers) as ex:
             while True:
                 frames = []
-                for _ in range(chunk):
+                while len(frames) < chunk:
                     ok, fr = cap.read()
                     if not ok:
                         break
-                    frames.append(fr)
+                    if read_idx % step == 0:
+                        if resize_needed:
+                            fr = cv2.resize(fr, (ow, oh), interpolation=cv2.INTER_AREA)
+                        frames.append(fr)
+                    read_idx += 1
                 if not frames:
                     break
                 for out in ex.map(fill, frames):  # 순서 보존
                     vw.write(out)
                 i += len(frames)
                 if progress:
-                    progress(f"{i}/{total} 프레임 지우는 중...")
+                    progress(f"{i}/{expected or '?'} 프레임 지우는 중...")
     finally:
         cap.release()
         vw.release()
