@@ -6,7 +6,7 @@ set PYTHONIOENCODING=utf-8
 
 REM First run: make its own venv (separate from the main app) and install.
 if not exist ".venv\Scripts\python.exe" (
-  echo [First-time setup] Creating environment and installing packages (a few minutes)...
+  echo [First-time setup] Creating environment and installing packages - a few minutes...
   py -3.12 -m venv .venv 2>nul || py -3 -m venv .venv 2>nul || python -m venv .venv
   if not exist ".venv\Scripts\python.exe" (
     echo *** Python not found. Install Python 3.12 from https://www.python.org/downloads/
