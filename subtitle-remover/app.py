@@ -25,6 +25,15 @@ STATIC = ROOT / "static"
 
 app = FastAPI(title="자막 지우개")
 
+
+@app.middleware("http")
+async def _no_cache(request, call_next):
+    # 정적 파일(app.js/index.html 등)을 브라우저가 캐시해 업데이트가 안 보이는 일 방지.
+    resp = await call_next(request)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 _jobs: dict = {}
 _lock = threading.Lock()
 
