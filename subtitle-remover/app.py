@@ -24,7 +24,21 @@ WORK.mkdir(exist_ok=True)
 STATIC = ROOT / "static"
 
 # 화면/서버가 같은 코드인지 바로 확인하기 위한 빌드 표식. 코드 바뀔 때마다 올림.
-BUILD = "v5 (2026-10-01 속도·타임스크롤)"
+BUILD = "v6 (2026-10-01 폴더확인)"
+
+# 실행 중인 폴더·버전·app.js 수정시각을 콘솔에 찍는다(업데이트/폴더 반영 여부 확인용).
+try:
+    import datetime as _dt
+    _ajs = STATIC / "app.js"
+    _mt = _dt.datetime.fromtimestamp(_ajs.stat().st_mtime).strftime("%Y-%m-%d %H:%M") \
+        if _ajs.exists() else "(app.js 없음)"
+    print("\n" + "=" * 60, flush=True)
+    print(f"  자막지우개 BUILD: {BUILD}", flush=True)
+    print(f"  실행 폴더       : {ROOT}", flush=True)
+    print(f"  app.js 수정시각 : {_mt}", flush=True)
+    print("=" * 60 + "\n", flush=True)
+except Exception:
+    pass
 
 app = FastAPI(title="자막 지우개")
 
