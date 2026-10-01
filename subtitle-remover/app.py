@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "work"
 WORK.mkdir(exist_ok=True)
 STATIC = ROOT / "static"
+# static 폴더가 없으면(복사 누락) StaticFiles가 즉시 크래시하므로 최소한 폴더는 보장.
+# (화면 파일 자체가 없으면 실행 배치에서 '업데이트.bat 실행' 안내로 먼저 걸러짐)
+STATIC.mkdir(parents=True, exist_ok=True)
 
 # 화면/서버가 같은 코드인지 바로 확인하기 위한 빌드 표식. 코드 바뀔 때마다 올림.
 BUILD = "v7 (2026-10-01 폴더경로표시)"

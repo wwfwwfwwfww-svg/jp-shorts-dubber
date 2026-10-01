@@ -27,6 +27,10 @@ REM re-check: if still broken, the install failed -> show it and stop
 "%VENVPY%" -c "import uvicorn, fastapi, cv2" 1>nul 2>nul
 if errorlevel 1 goto :install_failed
 
+REM make sure the UI files are present (a partial/incomplete copy can miss them)
+if not exist "static\index.html" goto :files_missing
+if not exist "app.py" goto :files_missing
+
 REM 3) free port 8008 and run (venv python by full path)
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8008" ^| findstr LISTENING') do taskkill /F /PID %%p >nul 2>&1
 echo.
@@ -58,6 +62,14 @@ exit /b 0
 echo.
 echo *** Package install failed (see errors above). Check your internet,
 echo     then delete the ".venv" folder inside "subtitle-remover" and run again. ***
+pause
+exit /b 1
+
+:files_missing
+echo.
+echo *** UI files are missing (the "static" folder is incomplete).
+echo     This copy is broken. Run the UPDATE batch file in this folder to
+echo     restore all files, then run this again. ***
 pause
 exit /b 1
 
