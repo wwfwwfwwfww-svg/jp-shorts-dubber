@@ -4,7 +4,8 @@
 if (-not $Root) {
   $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 }
-$Root = $Root.TrimEnd('\')
+# 방어: 배치에서 "...\" 가 넘어오며 끝에 따옴표가 박히는 경우 제거.
+$Root = $Root.Trim().Trim('"').TrimEnd('\')
 
 $name    = '쇼츠 스튜디오 (더빙+소재찾기)'
 $desktop = [Environment]::GetFolderPath('Desktop')
