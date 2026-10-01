@@ -5,8 +5,10 @@ GPU/torch 불필요(가벼움). 지정한 박스 영역을 매 프레임 cv2.inp
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, List, Optional
 
@@ -14,6 +16,7 @@ import cv2
 import numpy as np
 
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
+FFPROBE = shutil.which("ffprobe") or "ffprobe"
 
 
 def first_frame(src: str, out_jpg: str) -> tuple[int, int]:
@@ -28,7 +31,23 @@ def first_frame(src: str, out_jpg: str) -> tuple[int, int]:
 
 
 def duration(src: str) -> float:
-    """영상 길이(초). 못 구하면 0.0."""
+    """영상 길이(초). ffprobe 우선(정확), 실패 시 cv2 추정. 못 구하면 0.0."""
+    # 1) ffprobe (프레임카운트/가변프레임레이트에 영향 안 받음)
+    try:
+        res = subprocess.run(
+            [FFPROBE, "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nokey=1:noprint_wrappers=1", src],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=20,
+        )
+        val = (res.stdout or "").strip()
+        if val:
+            d = float(val)
+            if d > 0:
+                return d
+    except Exception:
+        pass
+    # 2) cv2 폴백
     cap = cv2.VideoCapture(src)
     try:
         fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
@@ -85,6 +104,19 @@ def build_mask(w: int, h: int, boxes: List[dict]) -> np.ndarray:
     return m
 
 
+def _mask_bbox(mask: np.ndarray, pad: int) -> Optional[tuple[int, int, int, int]]:
+    """마스크(지울 영역)를 감싸는 사각형 범위(여유 pad px 포함). 비어 있으면 None."""
+    ys, xs = np.where(mask > 0)
+    if xs.size == 0:
+        return None
+    h, w = mask.shape
+    x1 = max(0, int(xs.min()) - pad)
+    y1 = max(0, int(ys.min()) - pad)
+    x2 = min(w, int(xs.max()) + 1 + pad)
+    y2 = min(h, int(ys.max()) + 1 + pad)
+    return x1, y1, x2, y2
+
+
 def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
             progress: Optional[Callable[[str], None]] = None) -> None:
     cap = cv2.VideoCapture(src)
@@ -101,24 +133,46 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
         raise RuntimeError("지울 영역이 없습니다. 박스를 지정하세요.")
     radius = max(1, min(30, int(radius)))
 
+    # 전체 화면이 아니라 "지울 네모를 감싸는 영역만" inpaint → 대폭 속도 향상.
+    pad = radius + 8
+    bbox = _mask_bbox(mask, pad)
+    x1, y1, x2, y2 = bbox  # bbox는 mask.any()이므로 None 아님
+    mask_roi = np.ascontiguousarray(mask[y1:y2, x1:x2])
+
+    def fill(fr: np.ndarray) -> np.ndarray:
+        roi = np.ascontiguousarray(fr[y1:y2, x1:x2])
+        fr[y1:y2, x1:x2] = cv2.inpaint(roi, mask_roi, radius, cv2.INPAINT_TELEA)
+        return fr
+
     silent = str(Path(out_mp4).with_name("silent.mp4"))
     vw = cv2.VideoWriter(silent, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
     if not vw.isOpened():
         cap.release()
         raise RuntimeError("출력 영상을 만들 수 없습니다.")
 
+    # cv2.inpaint는 GIL을 풀어 여러 코어로 병렬 처리 가능. 메모리 보호 위해 청크 단위.
+    workers = max(1, min(6, (os.cpu_count() or 2)))
+    chunk = max(8, workers * 3)
     i = 0
-    while True:
-        ok, fr = cap.read()
-        if not ok:
-            break
-        out = cv2.inpaint(fr, mask, radius, cv2.INPAINT_TELEA)
-        vw.write(out)
-        i += 1
-        if progress and i % 15 == 0:
-            progress(f"{i}/{total} 프레임 지우는 중...")
-    cap.release()
-    vw.release()
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            while True:
+                frames = []
+                for _ in range(chunk):
+                    ok, fr = cap.read()
+                    if not ok:
+                        break
+                    frames.append(fr)
+                if not frames:
+                    break
+                for out in ex.map(fill, frames):  # 순서 보존
+                    vw.write(out)
+                i += len(frames)
+                if progress:
+                    progress(f"{i}/{total} 프레임 지우는 중...")
+    finally:
+        cap.release()
+        vw.release()
     if i == 0:
         raise RuntimeError("처리된 프레임이 없습니다.")
 
@@ -129,9 +183,14 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
            "-map", "0:v:0", "-map", "1:a:0?",
            "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-shortest", out_mp4]
-    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if res.returncode != 0 or not Path(out_mp4).exists():
-        # ffmpeg 실패 시 무음 영상이라도 결과로 제공
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
+        ok = res.returncode == 0 and Path(out_mp4).exists()
+    except FileNotFoundError:
+        ok = False  # ffmpeg 미설치 등
+    if not ok:
+        # ffmpeg 실패/부재 시 무음 영상이라도 결과로 제공
         shutil.copyfile(silent, out_mp4)
     try:
         Path(silent).unlink()
