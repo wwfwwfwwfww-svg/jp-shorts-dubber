@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import ai_engine
 import inpaint
 
 ROOT = Path(__file__).resolve().parent
@@ -27,7 +28,7 @@ STATIC = ROOT / "static"
 STATIC.mkdir(parents=True, exist_ok=True)
 
 # 화면/서버가 같은 코드인지 바로 확인하기 위한 빌드 표식. 코드 바뀔 때마다 올림.
-BUILD = "v7 (2026-10-01 폴더경로표시)"
+BUILD = "v8 (2026-10-01 AI엔진 LaMa)"
 
 # 실행 중인 폴더·버전·app.js 수정시각을 콘솔에 찍는다(업데이트/폴더 반영 여부 확인용).
 try:
@@ -70,6 +71,7 @@ class ProcessReq(BaseModel):
     radius: int = 6
     max_side: int = 720      # 결과 짧은 변 상한 px(0=원본 화질)
     target_fps: float = 30.0  # 결과 fps 상한(0=원본)
+    engine: str = "cv2"      # "cv2"(빠름) | "ai"(LaMa, 깔끔)
 
 
 def _set(jid: str, **kw) -> None:
@@ -105,6 +107,12 @@ def version():
     return {"build": BUILD}
 
 
+@app.get("/api/engines")
+def engines():
+    """프런트가 엔진 선택지를 그릴 때 사용: cv2는 항상, ai는 설치/ GPU 여부."""
+    return {"cv2": True, "ai": ai_engine.status()}
+
+
 @app.get("/api/{jid}/frame")
 def frame(jid: str, t: float | None = None, pos: float | None = None):
     src = WORK / jid / "source.mp4"
@@ -133,18 +141,26 @@ def process(jid: str, req: ProcessReq, bg: BackgroundTasks):
         raise HTTPException(404, "작업을 찾을 수 없습니다.")
     if not req.boxes:
         raise HTTPException(400, "지울 영역(박스)을 하나 이상 지정하세요.")
+    if req.engine == "ai" and not ai_engine.status().get("available"):
+        raise HTTPException(400, "AI 엔진이 설치되어 있지 않습니다. AI설치.bat을 먼저 실행하세요.")
     _set(jid, status="processing", message="시작...")
     boxes = [b.model_dump() for b in req.boxes]
-    bg.add_task(_run, jid, boxes, req.radius, req.max_side, req.target_fps)
+    bg.add_task(_run, jid, boxes, req.radius, req.max_side, req.target_fps, req.engine)
     return {"ok": True}
 
 
-def _run(jid: str, boxes: list, radius: int, max_side: int, target_fps: float) -> None:
+def _run(jid: str, boxes: list, radius: int, max_side: int, target_fps: float,
+         engine: str) -> None:
     d = WORK / jid
+    src, out = str(d / "source.mp4"), str(d / "output.mp4")
+    cb = lambda m: _set(jid, message=m)
     try:
-        inpaint.process(str(d / "source.mp4"), str(d / "output.mp4"), boxes, radius,
-                        max_side=max_side, target_fps=target_fps,
-                        progress=lambda m: _set(jid, message=m))
+        if engine == "ai":
+            inpaint.process_ai(src, out, boxes, max_side=max_side,
+                               target_fps=target_fps, progress=cb)
+        else:
+            inpaint.process(src, out, boxes, radius, max_side=max_side,
+                            target_fps=target_fps, progress=cb)
         _set(jid, status="done", message="완료 — 결과를 확인하세요.")
     except Exception as e:
         _set(jid, status="error", message=f"오류: {e}")

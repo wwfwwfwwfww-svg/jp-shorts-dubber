@@ -38,7 +38,14 @@
           </div>
         </div>
         <div class="side">
-          <div class="row"><label>지우개 세기 <output id="radius-out">6</output></label>
+          <div class="row"><label>지우는 방식(엔진)</label>
+            <select id="engine">
+              <option value="cv2" selected>빠름 (cv2) · 단순 배경용</option>
+              <option value="ai">AI 깔끔 (LaMa) · 복잡한 배경</option>
+            </select>
+            <p id="engine-note" class="hint">AI는 복잡·실사 배경도 깨끗이 지웁니다(GPU 권장).</p>
+          </div>
+          <div class="row" id="radius-row"><label>지우개 세기 <output id="radius-out">6</output></label>
             <input type="range" id="radius" min="2" max="20" step="1" value="6" /></div>
           <div class="row"><label>처리 화질 (낮을수록 빠름)</label>
             <select id="quality">
