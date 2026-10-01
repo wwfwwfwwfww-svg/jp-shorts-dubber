@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>자막 지우개</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🧽 자막 지우개</h1>
+    <p class="sub">영상에서 지울 부분에 네모를 치면 그 영역을 영상 전체에서 지웁니다. (무료·로컬)</p>
+  </header>
+
+  <main>
+    <!-- 1. 업로드 -->
+    <section class="card" id="card-upload">
+      <h2>1. 영상 올리기</h2>
+      <div class="row"><input type="file" id="file" accept="video/*" /></div>
+      <div class="actions"><button id="upload-btn" class="primary">업로드</button>
+        <span id="upload-msg" class="msg"></span></div>
+    </section>
+
+    <!-- 2. 영역 지정 -->
+    <section class="card" id="card-edit" hidden>
+      <h2>2. 지울 부분에 네모 치기 <span class="hint">마우스로 드래그 · 여러 개 가능</span></h2>
+      <div class="editwrap">
+        <div class="stage" id="stage">
+          <img id="frame" alt="첫 화면" />
+          <canvas id="canvas"></canvas>
+        </div>
+        <div class="side">
+          <div class="row"><label>지우개 세기 <output id="radius-out">6</output></label>
+            <input type="range" id="radius" min="2" max="20" step="1" value="6" /></div>
+          <div class="actions col">
+            <button id="undo">↶ 마지막 네모 취소</button>
+            <button id="clear">전체 지우기</button>
+          </div>
+          <p class="hint">검은 띠 위 글자·단순 배경은 깔끔하게, 복잡한 배경은 보통이에요.</p>
+          <button id="run" class="primary big">지우기 시작</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="progress" class="log" hidden></div>
+
+    <!-- 3. 결과 -->
+    <section class="card" id="card-result" hidden>
+      <h2>3. 결과</h2>
+      <video id="result" controls></video>
+      <div class="actions"><a id="download" class="primary" href="#">⬇ 다운로드</a>
+        <button id="restart">새 영상</button></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
