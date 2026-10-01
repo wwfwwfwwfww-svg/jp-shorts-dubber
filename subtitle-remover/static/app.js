@@ -1,4 +1,5 @@
 "use strict";
+// BUILD v7 (2026-10-01 폴더경로표시) — 화면 코드 버전 마커
 (function () {
   const $ = (id) => document.getElementById(id);
   let jid = null;

@@ -27,13 +27,31 @@ try {
 
   Write-Host '[3/3] 코드 갱신 중... (data / .env / .venv 는 그대로 유지)'
   # robocopy: 코드만 덮어씀. data/.venv/.git/__pycache__ 폴더와 .env/*.log 파일은 제외.
-  # /MIR 을 쓰지 않으므로 기존 파일 삭제는 없음(안전).
-  robocopy $src $Root /E /XD data .venv .git __pycache__ /XF .env *.log *.snapshot | Out-Null
+  # /IS /IT : 같아 보여도(타임스탬프/크기) 강제로 덮어쓴다(일부 파일만 갱신되는 문제 방지).
+  # /MIR 아님 → 기존 파일 삭제는 없음(안전).
+  robocopy $src $Root /E /IS /IT /XD data .venv .git __pycache__ /XF .env *.log *.snapshot | Out-Null
+  $rc = $LASTEXITCODE   # robocopy: 0~7 정상, 8 이상 실패
 
   Write-Host ''
-  Write-Host '업데이트 완료! 기존에 찾아둔 영상(data)과 API 키(.env)는 그대로입니다.'
-  Write-Host '이제 바탕화면 아이콘(또는 start.bat)으로 실행하세요.'
-  Write-Host '(패키지가 바뀐 경우 다음 실행 때 자동으로 재설치됩니다.)'
+  if ($rc -ge 8) {
+    Write-Host ('[오류] 파일 복사 실패(코드 ' + $rc + '). 폴더가 다른 프로그램에서 열려 있지 않은지 확인하고 다시 시도하세요.')
+  } else {
+    Write-Host '업데이트 완료! 기존에 찾아둔 영상(data)과 API 키(.env)는 그대로입니다.'
+    Write-Host '이제 바탕화면 아이콘(또는 start.bat)으로 실행하세요.'
+    Write-Host '(패키지가 바뀐 경우 다음 실행 때 자동으로 재설치됩니다.)'
+  }
+
+  # 어느 폴더에 무슨 버전이 설치됐는지 명확히 표시(폴더가 여러 개일 때 혼란 방지).
+  Write-Host ''
+  Write-Host '============================================================'
+  Write-Host ('  업데이트한 폴더: ' + $Root)
+  $appPy = Join-Path $Root 'subtitle-remover\app.py'
+  if (Test-Path $appPy) {
+    $buildLine = Select-String -Path $appPy -Pattern '^BUILD\s*=' -SimpleMatch:$false | Select-Object -First 1
+    if ($buildLine) { Write-Host ('  자막지우개 버전: ' + $buildLine.Line.Trim()) }
+  }
+  Write-Host '  ※ 이 폴더의 실행 파일(자막지우개_실행.bat / start.bat)로 실행하세요.'
+  Write-Host '============================================================'
 } catch {
   Write-Host ''
   Write-Host ('[오류] 업데이트 실패: ' + $_.Exception.Message)
