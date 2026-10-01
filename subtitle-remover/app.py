@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -61,14 +61,22 @@ async def upload(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, f)
     try:
         w, h = inpaint.first_frame(str(src), str(d / "frame.jpg"))
+        dur = inpaint.duration(str(src))
     except Exception as e:
         raise HTTPException(400, f"영상을 읽지 못했습니다: {e}")
-    _set(jid, status="uploaded", width=w, height=h)
-    return {"id": jid, "width": w, "height": h}
+    _set(jid, status="uploaded", width=w, height=h, duration=dur)
+    return {"id": jid, "width": w, "height": h, "duration": dur}
 
 
 @app.get("/api/{jid}/frame")
-def frame(jid: str):
+def frame(jid: str, t: float | None = None):
+    src = WORK / jid / "source.mp4"
+    if t is not None and t > 0 and src.exists():
+        try:
+            data = inpaint.frame_at(str(src), float(t))
+            return Response(content=data, media_type="image/jpeg")
+        except Exception:
+            pass  # 실패 시 첫 프레임으로 폴백
     p = WORK / jid / "frame.jpg"
     if not p.exists():
         raise HTTPException(404, "프레임 없음")
@@ -103,7 +111,8 @@ def status(jid: str):
     if not j:
         raise HTTPException(404, "작업을 찾을 수 없습니다.")
     return {"status": j.get("status"), "message": j.get("message", ""),
-            "width": j.get("width"), "height": j.get("height")}
+            "width": j.get("width"), "height": j.get("height"),
+            "duration": j.get("duration")}
 
 
 @app.get("/api/{jid}/result")

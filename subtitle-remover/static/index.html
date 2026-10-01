@@ -25,9 +25,16 @@
     <section class="card" id="card-edit" hidden>
       <h2>2. 지울 부분에 네모 치기 <span class="hint">마우스로 드래그 · 여러 개 가능</span></h2>
       <div class="editwrap">
-        <div class="stage" id="stage">
-          <img id="frame" alt="첫 화면" />
-          <canvas id="canvas"></canvas>
+        <div class="stagewrap">
+          <div class="stage" id="stage">
+            <img id="frame" alt="첫 화면" />
+            <canvas id="canvas"></canvas>
+          </div>
+          <div class="seekrow" id="seekrow" hidden>
+            <input type="range" id="seek" min="0" max="0" step="0.1" value="0" />
+            <span id="seek-out" class="msg">0:00 / 0:00</span>
+            <p class="hint">스크롤을 움직여 다른 장면을 확인하세요. 친 네모는 영상 전체 구간에 적용됩니다.</p>
+          </div>
         </div>
         <div class="side">
           <div class="row"><label>지우개 세기 <output id="radius-out">6</output></label>
