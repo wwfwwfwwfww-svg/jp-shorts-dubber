@@ -8,6 +8,8 @@ body { margin: 0; background: var(--bg); color: var(--text);
 header { padding: 18px 16px 6px; max-width: 980px; margin: 0 auto; }
 header h1 { margin: 0; font-size: 22px; }
 header .sub { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+.buildtag { font-size: 12px; font-weight: 400; color: #8fd18f; vertical-align: middle;
+  background: #16321a; border: 1px solid #2f5c34; border-radius: 6px; padding: 2px 7px; margin-left: 8px; }
 main { max-width: 980px; margin: 0 auto; padding: 8px 16px 40px; }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;

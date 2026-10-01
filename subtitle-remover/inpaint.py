@@ -64,6 +64,51 @@ def duration(src: str) -> float:
     return 0.0
 
 
+def _encode_jpg(fr: np.ndarray) -> bytes:
+    ok, buf = cv2.imencode(".jpg", fr)
+    if not ok:
+        raise RuntimeError("프레임 인코딩 실패.")
+    return buf.tobytes()
+
+
+def fps(src: str) -> float:
+    """영상 프레임레이트. 못 구하면 0.0."""
+    cap = cv2.VideoCapture(src)
+    try:
+        return float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    finally:
+        cap.release()
+
+
+def frame_at_ratio(src: str, ratio: float) -> bytes:
+    """영상 길이의 ratio(0~1) 위치 프레임을 jpg 바이트로 반환.
+
+    길이·fps를 전혀 쓰지 않으므로(프레임 인덱스/위치 비율만 사용) 길이 인식이
+    안 되는 파일에서도 타임스크롤이 동작한다.
+    """
+    r = min(max(float(ratio), 0.0), 0.9999)
+    cap = cv2.VideoCapture(src)
+    try:
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+        ok, fr = False, None
+        if total > 0:
+            idx = min(int(total * r), total - 1)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, fr = cap.read()
+        if not ok or fr is None:
+            # 프레임수를 못 구하면 재생위치 비율로 시킹
+            cap.set(cv2.CAP_PROP_POS_AVI_RATIO, r)
+            ok, fr = cap.read()
+        if not ok or fr is None:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ok, fr = cap.read()
+        if not ok or fr is None:
+            raise RuntimeError("프레임을 읽을 수 없습니다.")
+        return _encode_jpg(fr)
+    finally:
+        cap.release()
+
+
 def frame_at(src: str, t_sec: float) -> bytes:
     """t초 시점의 프레임을 jpg 바이트로 반환(미리보기용)."""
     cap = cv2.VideoCapture(src)
@@ -86,10 +131,7 @@ def frame_at(src: str, t_sec: float) -> bytes:
             ok, fr = cap.read()
         if not ok or fr is None:
             raise RuntimeError("프레임을 읽을 수 없습니다.")
-        ok2, buf = cv2.imencode(".jpg", fr)
-        if not ok2:
-            raise RuntimeError("프레임 인코딩 실패.")
-        return buf.tobytes()
+        return _encode_jpg(fr)
     finally:
         cap.release()
 
@@ -181,6 +223,9 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
     # cv2.inpaint는 GIL을 풀어 여러 코어로 병렬 처리 가능. 메모리 보호 위해 청크 단위.
     workers = max(1, min(6, (os.cpu_count() or 2)))
     chunk = max(8, workers * 3)
+    tag = f"{ow}x{oh}·{ofps:.0f}fps"  # 실제 처리 해상도/프레임레이트(화면에 표시 → 버전 확인용)
+    if progress:
+        progress(f"{tag} 처리 시작 — 0/{expected or '?'} 프레임")
     i = 0           # 기록한 프레임 수
     read_idx = 0    # 읽은 원본 프레임 인덱스(프레임 건너뛰기용)
     try:
@@ -202,7 +247,7 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
                     vw.write(out)
                 i += len(frames)
                 if progress:
-                    progress(f"{i}/{expected or '?'} 프레임 지우는 중...")
+                    progress(f"{tag}  {i}/{expected or '?'} 프레임 지우는 중...")
     finally:
         cap.release()
         vw.release()
@@ -214,7 +259,7 @@ def process(src: str, out_mp4: str, boxes: List[dict], radius: int = 6,
         progress("오디오 합치고 마무리 중...")
     cmd = [FFMPEG, "-y", "-i", silent, "-i", src,
            "-map", "0:v:0", "-map", "1:a:0?",
-           "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
+           "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-shortest", out_mp4]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True,

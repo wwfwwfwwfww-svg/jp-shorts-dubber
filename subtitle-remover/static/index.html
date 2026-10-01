@@ -8,7 +8,7 @@
 </head>
 <body>
   <header>
-    <h1>🧽 자막 지우개</h1>
+    <h1>🧽 자막 지우개 <span id="build" class="buildtag">확인 중…</span></h1>
     <p class="sub">영상에서 지울 부분에 네모를 치면 그 영역을 영상 전체에서 지웁니다. (무료·로컬)</p>
   </header>
 
@@ -31,9 +31,10 @@
             <canvas id="canvas"></canvas>
           </div>
           <div class="seekrow" id="seekrow" hidden>
-            <input type="range" id="seek" min="0" max="0" step="0.1" value="0" />
-            <span id="seek-out" class="msg">0:00 / 0:00</span>
-            <p class="hint">스크롤을 움직여 다른 장면을 확인하세요. 친 네모는 영상 전체 구간에 적용됩니다.</p>
+            <input type="range" id="seek" min="0" max="1000" step="1" value="0" />
+            <span id="seek-out" class="msg">0%</span>
+            <p class="hint">◀▶ 슬라이더로 다른 장면을 확인하세요. 친 네모는 영상 전체 구간에 적용됩니다.</p>
+            <p id="vinfo" class="msg"></p>
           </div>
         </div>
         <div class="side">
