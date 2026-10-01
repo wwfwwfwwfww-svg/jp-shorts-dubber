@@ -39,11 +39,18 @@
         <div class="side">
           <div class="row"><label>지우개 세기 <output id="radius-out">6</output></label>
             <input type="range" id="radius" min="2" max="20" step="1" value="6" /></div>
+          <div class="row"><label>처리 화질 (낮을수록 빠름)</label>
+            <select id="quality">
+              <option value="540">540p · 30fps (가장 빠름)</option>
+              <option value="720" selected>720p · 30fps (권장)</option>
+              <option value="1080">1080p · 30fps</option>
+              <option value="0">원본 화질 (가장 느림)</option>
+            </select></div>
           <div class="actions col">
             <button id="undo">↶ 마지막 네모 취소</button>
             <button id="clear">전체 지우기</button>
           </div>
-          <p class="hint">검은 띠 위 글자·단순 배경은 깔끔하게, 복잡한 배경은 보통이에요.</p>
+          <p class="hint">네모를 꼭 필요한 부분만 작게 칠수록 빨라요. 쇼츠는 720p면 충분합니다.</p>
           <button id="run" class="primary big">지우기 시작</button>
         </div>
       </div>

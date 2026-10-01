@@ -48,6 +48,8 @@ class Box(BaseModel):
 class ProcessReq(BaseModel):
     boxes: List[Box]
     radius: int = 6
+    max_side: int = 720      # 결과 짧은 변 상한 px(0=원본 화질)
+    target_fps: float = 30.0  # 결과 fps 상한(0=원본)
 
 
 def _set(jid: str, **kw) -> None:
@@ -100,14 +102,15 @@ def process(jid: str, req: ProcessReq, bg: BackgroundTasks):
         raise HTTPException(400, "지울 영역(박스)을 하나 이상 지정하세요.")
     _set(jid, status="processing", message="시작...")
     boxes = [b.model_dump() for b in req.boxes]
-    bg.add_task(_run, jid, boxes, req.radius)
+    bg.add_task(_run, jid, boxes, req.radius, req.max_side, req.target_fps)
     return {"ok": True}
 
 
-def _run(jid: str, boxes: list, radius: int) -> None:
+def _run(jid: str, boxes: list, radius: int, max_side: int, target_fps: float) -> None:
     d = WORK / jid
     try:
         inpaint.process(str(d / "source.mp4"), str(d / "output.mp4"), boxes, radius,
+                        max_side=max_side, target_fps=target_fps,
                         progress=lambda m: _set(jid, message=m))
         _set(jid, status="done", message="완료 — 결과를 확인하세요.")
     except Exception as e:

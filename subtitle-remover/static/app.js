@@ -141,9 +141,13 @@
     $("run").disabled = true;
     $("progress").hidden = false; $("progress").textContent = "요청 중...";
     try {
+      const maxSide = Number($("quality").value);  // 0=원본
       const r = await fetch("/api/" + jid + "/process", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ boxes, radius: Number($("radius").value) }),
+        body: JSON.stringify({
+          boxes, radius: Number($("radius").value),
+          max_side: maxSide, target_fps: maxSide === 0 ? 0 : 30,
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || "처리 실패");
