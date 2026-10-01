@@ -4,7 +4,8 @@
 if (-not $Root) {
   $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 }
-$Root = $Root.TrimEnd('\')
+# 방어: 배치에서 "...\" 가 넘어오며 끝에 따옴표가 박히는 경우 제거.
+$Root = $Root.Trim().Trim('"').TrimEnd('\')
 
 $zipUrl = 'https://github.com/wwfwwfwwfww-svg/jp-shorts-dubber/archive/refs/heads/main.zip'
 $tmp = Join-Path $env:TEMP ('jpupd_' + [Guid]::NewGuid().ToString('N'))
