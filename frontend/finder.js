@@ -393,9 +393,18 @@
       wrap.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => delChannel(b.dataset.del)));
     } catch (e) { $("f-channels").innerHTML = "불러오기 실패: " + e.message; }
   }
+  function afterScanRefresh() {
+    // 스캔은 백그라운드(유튜브 API 호출). 몇 초 뒤 영상 목록·채널표를 자동 갱신.
+    [3000, 7000, 12000].forEach((ms) => setTimeout(() => {
+      refreshGrid(); loadChannels();
+    }, ms));
+  }
   async function scanChannel(id) {
-    try { await jsend("POST", "/channels/scan?channel_id=" + encodeURIComponent(id)); alert("스캔을 시작했습니다."); }
-    catch (e) { alert("실패: " + e.message); }
+    try {
+      await jsend("POST", "/channels/scan?channel_id=" + encodeURIComponent(id));
+      alert("스캔 시작 — 새 영상이 아래 '영상 목록'에 추가됩니다. 몇 초 뒤 자동 갱신돼요.");
+      afterScanRefresh();
+    } catch (e) { alert("실패: " + e.message); }
   }
   async function delChannel(id) {
     if (!confirm("이 레퍼런스 채널을 삭제할까요?")) return;
@@ -506,8 +515,11 @@
     ["f-t-unentered", "f-t-small", "f-t-hidewatched"].forEach((id) =>
       $(id).addEventListener("change", refreshGrid));
     $("f-scan-all").addEventListener("click", async () => {
-      try { await jsend("POST", "/channels/scan"); alert("전체 레퍼런스 채널 스캔을 시작했습니다."); }
-      catch (e) { alert("실패: " + e.message); }
+      try {
+        await jsend("POST", "/channels/scan");
+        alert("전체 레퍼런스 스캔 시작 — 새 영상이 아래 '영상 목록'에 추가됩니다. 몇 초 뒤 자동 갱신돼요.");
+        afterScanRefresh();
+      } catch (e) { alert("실패: " + e.message); }
     });
     $("f-report-load").addEventListener("click", loadReport);
     $("f-modal-close").addEventListener("click", closeModal);

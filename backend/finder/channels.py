@@ -154,7 +154,7 @@ def scan_reference(channel_id: Optional[str] = None) -> dict:
         except youtube.YouTubeError:
             continue
         added = search.persist_videos(details, region="레퍼런스",
-                                      category=r["ref_category"] or "")
+                                      category=r["ref_category"] or "", trusted=True)
         total_new += added
         scanned += 1
         with db.get_conn() as c:

@@ -76,12 +76,17 @@ def resolve_keywords(req: SearchRequest) -> List[Tuple[str, str]]:
 def persist_videos(details: List[dict], *, region: str = "",
                    region_map: Optional[Dict[str, str]] = None,
                    category_map: Optional[Dict[str, str]] = None,
-                   category: str = "", view_floor: Optional[int] = None) -> int:
-    """Filter + score + upsert videos.list items. Returns count of newly-added rows."""
+                   category: str = "", view_floor: Optional[int] = None,
+                   trusted: bool = False) -> int:
+    """Filter + score + upsert videos.list items. Returns count of newly-added rows.
+
+    trusted=True (레퍼런스 채널 스캔 등 사용자가 직접 고른 채널)면 지역/비서구 필터를
+    건너뛴다 — 사용자가 등록한 채널의 영상은 국가 상관없이 수집한다.
+    """
     keep = [it for it in details
             if filters.duration_ok(it)
             and not filters.is_korean_or_japanese(it)
-            and not filters.is_non_target(it)]   # 인도·동남아 등 비서구 재업로드 제외
+            and (trusted or not filters.is_non_target(it))]  # 신뢰 소스면 비서구 필터 생략
     if not keep:
         return 0
 
@@ -95,8 +100,8 @@ def persist_videos(details: List[dict], *, region: str = "",
         stats = it.get("statistics", {})
         cid = snip.get("channelId", "")
         chan = chan_rows.get(cid, {})
-        # 비서구 재업로드 채널 제외(채널 국가 기준). 국가 미설정이면 통과(완벽 X).
-        if (chan.get("country") or "").upper() in filters.BLOCK_CHANNEL_COUNTRIES:
+        # 비서구 재업로드 채널 제외(채널 국가 기준). 신뢰 소스(레퍼런스)면 생략.
+        if (not trusted) and (chan.get("country") or "").upper() in filters.BLOCK_CHANNEL_COUNTRIES:
             continue
         views = int(stats.get("viewCount", 0) or 0)
         if view_floor and views < view_floor:
