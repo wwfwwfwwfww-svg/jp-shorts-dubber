@@ -95,7 +95,7 @@ FINDER_PER_KEYWORD = int(_get_float("FINDER_PER_KEYWORD", 50))        # 키워�
 FINDER_PERIOD_DAYS = int(_get_float("FINDER_PERIOD_DAYS", 14))        # 기본 검색 기간 2주
 FINDER_REGIONS = [r.strip().upper() for r in
                   _get_str("FINDER_REGIONS",
-                           "US,GB,CA,AU,DE,FR,ES,BR,MX,ID").split(",") if r.strip()]
+                           "US,GB,CA,AU").split(",") if r.strip()]  # 영어권 위주(서구 바이럴)
 FINDER_SCAN_HOURS = int(_get_float("FINDER_SCAN_HOURS", 6))           # 레퍼런스 채널 자동 스캔 주기
 FINDER_MORNING_HOUR = int(_get_float("FINDER_MORNING_HOUR", 7))       # 아침 자동수집 시각
 FINDER_QUOTA_LIMIT = int(_get_float("FINDER_QUOTA_LIMIT", 10_000))    # YouTube Data API 일일 한도
