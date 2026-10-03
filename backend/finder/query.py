@@ -95,3 +95,14 @@ def counts() -> dict:
         total = c.execute("SELECT COUNT(*) FROM videos WHERE status!='excluded'").fetchone()[0]
         by_status = c.execute("SELECT status, COUNT(*) n FROM videos GROUP BY status").fetchall()
     return {"total": total, "by_status": {r["status"]: r["n"] for r in by_status}}
+
+
+def clear_videos(*, keep_saved: bool = True) -> int:
+    """수집 목록 비우기. keep_saved면 사용자가 고른 bookmark/working/done은 보존하고
+    new/excluded만 삭제. 아니면 전부 삭제. 삭제한 행 수 반환."""
+    with db.get_conn() as c:
+        if keep_saved:
+            cur = c.execute("DELETE FROM videos WHERE status IN ('new','excluded')")
+        else:
+            cur = c.execute("DELETE FROM videos")
+        return cur.rowcount or 0

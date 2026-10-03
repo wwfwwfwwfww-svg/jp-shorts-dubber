@@ -50,8 +50,16 @@ def init_db() -> None:
         config.DATA_DIR.mkdir(exist_ok=True)
         with get_conn() as c:
             c.executescript(_SCHEMA)
+            _migrate(c)
             _seed(c)
         _initialized = True
+
+
+def _migrate(c) -> None:
+    """기존 DB에 새 컬럼이 없으면 추가(idempotent)."""
+    cols = {r["name"] for r in c.execute("PRAGMA table_info(channels)").fetchall()}
+    if "country" not in cols:
+        c.execute("ALTER TABLE channels ADD COLUMN country TEXT DEFAULT ''")
 
 
 _SCHEMA = """
@@ -100,7 +108,8 @@ CREATE TABLE IF NOT EXISTS channels (
     is_reference  INTEGER DEFAULT 0,
     ref_category  TEXT DEFAULT '',
     last_scan_at  TEXT,
-    added_at      TEXT DEFAULT ''
+    added_at      TEXT DEFAULT '',
+    country       TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS keywords (

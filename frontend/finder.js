@@ -9,6 +9,9 @@
   let loaded = false;          // 첫 진입 시에만 초기 로드
   let categories = [];
   let searchTimer = null;
+  let allVideos = [];          // 현재 필터로 받아온 전체 목록
+  let shown = 0;               // 화면에 그린 개수(페이지네이션)
+  const PAGE = 24;
 
   // ---------- 유틸 ----------
   async function jget(path) {
@@ -247,20 +250,31 @@
   async function refreshGrid() {
     try {
       const data = await jget("/videos?" + filterQS());
-      renderGrid(data.videos || []);
+      allVideos = data.videos || [];
+      shown = Math.min(PAGE, allVideos.length);
+      renderGrid();
       const c = data.counts || {};
-      $("f-count").textContent = `표시 ${(data.videos || []).length} · 전체 ${c.total || 0}`;
+      window._f_total = c.total || 0;
+      updateCount();
       $("f-export").href = api + "/videos/export.csv?" + filterQS();
     } catch (e) { $("f-count").textContent = "불러오기 실패: " + e.message; }
   }
 
-  function renderGrid(videos) {
+  function updateCount() {
+    $("f-count").textContent =
+      `표시 ${Math.min(shown, allVideos.length)}/${allVideos.length} · 전체 ${window._f_total || 0}`;
+  }
+
+  function renderGrid() {
     const grid = $("f-grid");
     grid.innerHTML = "";
-    $("f-empty").hidden = videos.length > 0;
+    $("f-empty").hidden = allVideos.length > 0;
     const catWarn = {};
     categories.forEach((c) => { if (c.warn_tag) catWarn[c.name] = c.warn_tag; });
-    videos.forEach((v) => grid.appendChild(card(v, catWarn)));
+    allVideos.slice(0, shown).forEach((v) => grid.appendChild(card(v, catWarn)));
+    const more = $("f-more");
+    if (more) more.hidden = shown >= allVideos.length;
+    updateCount();
   }
 
   function card(v, catWarn) {
@@ -466,6 +480,18 @@
     $("f-estimate").addEventListener("click", estimate);
     $("f-search").addEventListener("click", startSearch);
     $("f-refresh").addEventListener("click", refreshGrid);
+    $("f-more").addEventListener("click", () => {
+      shown = Math.min(shown + PAGE, allVideos.length);
+      renderGrid();
+    });
+    $("f-clear").addEventListener("click", async () => {
+      if (!confirm("수집 목록을 비웁니다.\n(북마크·작업·완료로 표시한 영상은 남습니다)\n계속할까요?")) return;
+      try {
+        const r = await jsend("POST", "/videos/clear", {});
+        alert(`${r.deleted || 0}개 비웠습니다.`);
+        refreshGrid();
+      } catch (e) { alert("비우기 실패: " + e.message); }
+    });
     $("f-categorize").addEventListener("click", async () => {
       try { const r = await jsend("POST", "/categorize", { limit: 40 }); alert(r.message); }
       catch (e) { alert("실패: " + e.message); }

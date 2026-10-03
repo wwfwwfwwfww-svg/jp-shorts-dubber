@@ -38,16 +38,18 @@ def upsert_channel(item: dict) -> dict:
     stats = item.get("statistics", {})
     uploads = item.get("contentDetails", {}).get("relatedPlaylists", {}).get("uploads", "")
     subs = int(stats.get("subscriberCount", 0) or 0)
+    country = (snip.get("country", "") or "").upper()
     with db.get_conn() as c:
         c.execute(
-            "INSERT INTO channels(channel_id, title, subscribers, uploads_playlist, added_at) "
-            "VALUES(?,?,?,?,?) ON CONFLICT(channel_id) DO UPDATE SET "
+            "INSERT INTO channels(channel_id, title, subscribers, uploads_playlist, country, added_at) "
+            "VALUES(?,?,?,?,?,?) ON CONFLICT(channel_id) DO UPDATE SET "
             "title=excluded.title, subscribers=excluded.subscribers, "
+            "country=COALESCE(NULLIF(excluded.country,''), channels.country), "
             "uploads_playlist=COALESCE(NULLIF(excluded.uploads_playlist,''), channels.uploads_playlist)",
-            (cid, snip.get("title", ""), subs, uploads, _now()),
+            (cid, snip.get("title", ""), subs, uploads, country, _now()),
         )
     return {"channel_id": cid, "title": snip.get("title", ""),
-            "subscribers": subs, "uploads_playlist": uploads}
+            "subscribers": subs, "uploads_playlist": uploads, "country": country}
 
 
 def ensure_channels(channel_ids: List[str]) -> Dict[str, dict]:
