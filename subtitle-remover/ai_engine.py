@@ -39,18 +39,25 @@ def _lama():
     """LaMa 모델 지연 로드(싱글턴). GPU 있으면 GPU, 없으면 CPU."""
     global _LAMA
     if _LAMA is None:
+        import torch
         from simple_lama_inpainting import SimpleLama
+        try:
+            torch.backends.cudnn.benchmark = True  # 같은 크기 반복 → 약간 빠름
+        except Exception:
+            pass
         _LAMA = SimpleLama()  # 내부에서 cuda 가용 시 자동 GPU 사용
     return _LAMA
 
 
 def inpaint_frame(bgr: np.ndarray, mask_gray: np.ndarray) -> np.ndarray:
     """한 프레임(BGR)에서 마스크(흰색=지울 영역) 영역을 LaMa로 지운 BGR 반환."""
+    import torch
     from PIL import Image
     lama = _lama()
     img = Image.fromarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
     mask = Image.fromarray(mask_gray).convert("L")
-    res = lama(img, mask)  # PIL RGB
+    with torch.inference_mode():  # autograd 끔 → 메모리·오버헤드 절감
+        res = lama(img, mask)  # PIL RGB
     out = cv2.cvtColor(np.array(res), cv2.COLOR_RGB2BGR)
     if out.shape[:2] != bgr.shape[:2]:  # 모델이 크기를 바꾸면 되돌림(방어)
         out = cv2.resize(out, (bgr.shape[1], bgr.shape[0]))
