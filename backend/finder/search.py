@@ -79,7 +79,9 @@ def persist_videos(details: List[dict], *, region: str = "",
                    category: str = "", view_floor: Optional[int] = None) -> int:
     """Filter + score + upsert videos.list items. Returns count of newly-added rows."""
     keep = [it for it in details
-            if filters.duration_ok(it) and not filters.is_korean_or_japanese(it)]
+            if filters.duration_ok(it)
+            and not filters.is_korean_or_japanese(it)
+            and not filters.is_non_target(it)]   # 인도·동남아 등 비서구 재업로드 제외
     if not keep:
         return 0
 
