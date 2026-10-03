@@ -151,6 +151,14 @@ def export_csv(
                     headers={"Content-Disposition": "attachment; filename=finder_videos.csv"})
 
 
+@router.post("/videos/clear")
+def clear_videos(keep_saved: bool = True):
+    """수집 목록 비우기(기본: 북마크/작업/완료는 보존, new/제외만 삭제)."""
+    db.init_db()
+    deleted = query.clear_videos(keep_saved=keep_saved)
+    return {"ok": True, "deleted": deleted}
+
+
 @router.patch("/videos/{video_id}")
 def patch_video(video_id: str, patch: VideoPatch):
     db.init_db()

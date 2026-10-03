@@ -138,3 +138,7 @@
   .f-grid { grid-template-columns: 1fr 1fr; }
   .f-header { flex-direction: column; }
 }
+
+/* 페이지네이션 "더 보기" 버튼 */
+.f-more-wrap { text-align: center; margin: 16px 0 8px; }
+#f-more { padding: 10px 24px; font-size: 14px; }

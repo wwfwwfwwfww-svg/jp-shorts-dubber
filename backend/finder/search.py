@@ -94,11 +94,14 @@ def persist_videos(details: List[dict], *, region: str = "",
         snip = it.get("snippet", {})
         stats = it.get("statistics", {})
         cid = snip.get("channelId", "")
+        chan = chan_rows.get(cid, {})
+        # 비서구 재업로드 채널 제외(채널 국가 기준). 국가 미설정이면 통과(완벽 X).
+        if (chan.get("country") or "").upper() in filters.BLOCK_CHANNEL_COUNTRIES:
+            continue
         views = int(stats.get("viewCount", 0) or 0)
         if view_floor and views < view_floor:
             continue
         likes = int(stats.get("likeCount", 0) or 0)
-        chan = chan_rows.get(cid, {})
         subs = int(chan.get("subscribers", 0) or 0)
         chan_avg = channels.avg_views(cid, chan.get("uploads_playlist", "")) if cid else 0.0
         m = metrics.compute(views, likes, subs, chan_avg, snip.get("publishedAt", ""))

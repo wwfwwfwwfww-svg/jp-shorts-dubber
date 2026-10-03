@@ -38,6 +38,12 @@ _BLOCK_LANGS = {
 }
 MAX_DURATION_SEC = 180
 
+# 서구 바이럴이 아닌 재업로드가 몰리는 채널 국가(남아시아·동남아). 채널 country 기준으로 제외.
+BLOCK_CHANNEL_COUNTRIES = {
+    "IN", "PK", "BD", "NP", "LK",          # 남아시아
+    "ID", "TH", "VN", "PH", "MM", "KH",    # 동남아
+}
+
 
 def parse_duration(iso: str) -> int:
     """ISO-8601 duration (e.g. PT1M5S) -> seconds. Returns 0 if unparseable."""
